@@ -18,9 +18,10 @@ public class MessageChannelList {
    * Thread safe method for retrieving a channel's history
    * @return The Channel's History
    * */
-  public List<String> getChannelHistory(String channelName){
+  public Object[] getChannelHistory(String channelName){
     if (channelPostings.containsKey(channelName)){
-      return channelPostings.get(channelName);
+      //Return new reference to release read lock
+      return channelPostings.get(channelName).toArray();
     }else {
       return null;
     }

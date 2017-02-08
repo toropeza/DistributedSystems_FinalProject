@@ -4,22 +4,23 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.List;
 
 /**
  * Runnable Class that parses the Requests coming into the MessageServerAPI
  * */
 public class MessageServerAPIHelper implements Runnable {
 
-  private final String HTTP200 = "HTTP-1.0 200 OK \n";
-  private final String HTTP400 = "HTTP-1.0 400 Bad Request \n";
-  private final String HTTP404 = "HTTP-1.0 404 Not Found \n";
-  private final String HTTP405 = "HTTP-1.0 405 Method Not Allowed \n";
+  //HTTP Response Codes
+  private final String HTTP200 = "HTTP-1.0 200 OK \r\n";
+  private final String HTTP400 = "HTTP-1.0 400 Bad Request \r\n";
+  private final String HTTP404 = "HTTP-1.0 404 Not Found \r\n";
+  private final String HTTP405 = "HTTP-1.0 405 Method Not Allowed \r\n";
 
+  //API Methods
   private final String postMessageMethod = "chat.postMessage";
   private final String channelHistoryMethod = "channels.history";
 
-  //Socket connnection for the request
+  //Socket connection for the request
   private Socket socket;
 
   //List of channels with postings
@@ -50,7 +51,12 @@ public class MessageServerAPIHelper implements Runnable {
         String request = httpHelper.getResource(line);
         String response = parseAPIRequest(request);
         if (response != null){
-          out.write(response);
+          if (response.contains(HTTP200)){
+            out.write(response);
+          }else {
+            out.write(response);
+            out.write(getSuccessResponse(false));
+          }
         }
       }else {
         out.write(HTTP405);
@@ -65,7 +71,7 @@ public class MessageServerAPIHelper implements Runnable {
 
   /**
    * Parses the API Request line to interact with the API
-   * @param request The REST Request
+   * @param request The REST Request to the Request
    * */
   private String parseAPIRequest(String request){
     String response = HTTP404;
@@ -94,15 +100,17 @@ public class MessageServerAPIHelper implements Runnable {
     String response = HTTP404;
     if (params != null){
       HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap.containsKey("channel")){
+      if (urlParamsMap != null && urlParamsMap.containsKey("channel")){
         String channel = urlParamsMap.get("channel");
         if (channel != null){
-          List<String> channelHistory = channelList.getChannelHistory(channel);
+          Object[] channelHistory = channelList.getChannelHistory(channel);
           boolean success = channelHistory != null;
           response = HTTP200 + getChannelHistoryResponse(channelHistory, success);
         }else {
           response = HTTP400;
         }
+      }else {
+        response = HTTP404;
       }
     }
     return response;
@@ -113,19 +121,19 @@ public class MessageServerAPIHelper implements Runnable {
    * @param channelHistory The channel postings
    * @return the JSON response for retrieving a channel's history
    * */
-  public String getChannelHistoryResponse(List<String> channelHistory, boolean success){
+  public String getChannelHistoryResponse(Object[] channelHistory, boolean success){
     StringBuffer buffer = new StringBuffer();
     buffer.append("{");
     buffer.append("\"success\":" + success + ",");
     buffer.append("\"messages\":[");
     if (success){
       buffer.append("\"");
-      buffer.append(channelHistory.get(0));
+      buffer.append(channelHistory[0].toString().replaceAll("%20", " "));
       buffer.append("\"");
-      for (int i = 1; i < channelHistory.size(); i++){
+      for (int i = 1; i < channelHistory.length; i++){
         buffer.append(",");
         buffer.append("\"");
-        buffer.append(channelHistory.get(i));
+        buffer.append(channelHistory[i].toString().replaceAll("%20", " "));
         buffer.append("\"");
       }
     }
@@ -143,15 +151,17 @@ public class MessageServerAPIHelper implements Runnable {
     String response = HTTP404;
     if (params != null){
       HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap.containsKey("channel") && urlParamsMap.containsKey("text")){
+      if (urlParamsMap != null && urlParamsMap.containsKey("channel") && urlParamsMap.containsKey("text")){
         String channel = urlParamsMap.get("channel");
         String text = urlParamsMap.get("text");
         if (channel != null && text != null){
           channelList.postMessage(channel, text);
-          response = HTTP200 + getPostMessageResponse();
+          response = HTTP200 + getSuccessResponse(true);
         }else {
           response = HTTP400;
         }
+      }else {
+        response = HTTP404;
       }
     }
     return response;
@@ -160,10 +170,10 @@ public class MessageServerAPIHelper implements Runnable {
   /**
    * @return the JSON response for posting to a channel
    * */
-  public String getPostMessageResponse(){
+  public String getSuccessResponse(boolean success){
     StringBuffer buffer = new StringBuffer();
     buffer.append("{");
-    buffer.append("\"success\":true");
+    buffer.append("\"success\":" + success + "");
     buffer.append("}\n");
     return buffer.toString();
   }

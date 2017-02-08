@@ -36,10 +36,12 @@ public class HTTPHelper {
     HashMap<String, String> urlParamsMap = new HashMap<>();
     for (String param: params.split("&")){
       String[] paramKeyValue = param.split("=");
-      String key = paramKeyValue[0];
-      String value = paramKeyValue[1];
-      if (key != null && value != null){
+      if (paramKeyValue.length == 2){
+        String key = paramKeyValue[0];
+        String value = paramKeyValue[1];
         urlParamsMap.put(key, value);
+      }else {
+        return null;
       }
     }
     return urlParamsMap;
