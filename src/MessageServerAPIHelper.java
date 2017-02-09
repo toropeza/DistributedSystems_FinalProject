@@ -11,10 +11,13 @@ import java.util.HashMap;
 public class MessageServerAPIHelper implements Runnable {
 
   //HTTP Response Codes
-  private final String HTTP200 = "HTTP-1.0 200 OK \r\n";
-  private final String HTTP400 = "HTTP-1.0 400 Bad Request \r\n";
-  private final String HTTP404 = "HTTP-1.0 404 Not Found \r\n";
-  private final String HTTP405 = "HTTP-1.0 405 Method Not Allowed \r\n";
+  private final String HTTP200 = "HTTP/1.1 200 OK\n";
+  private final String HTTP400 = "HTTP/1.1 400 Bad Request \r\n";
+  private final String HTTP404 = "HTTP/1.1 404 Not Found \r\n";
+  private final String HTTP405 = "HTTP/1.1 405 Method Not Allowed \r\n";
+
+  private final String CONTENT_TYPE = "Content-Type: application/json \n";
+  private String CONTENT_LENGTH = "Content-Length:";
 
   //API Methods
   private final String postMessageMethod = "chat.postMessage";
@@ -47,6 +50,7 @@ public class MessageServerAPIHelper implements Runnable {
       PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
       String line = in.readLine();
+      System.out.println(line);
       if (httpHelper.isHTTPGET(line)){
         String request = httpHelper.getResource(line);
         String response = parseAPIRequest(request);
@@ -105,7 +109,8 @@ public class MessageServerAPIHelper implements Runnable {
         if (channel != null){
           Object[] channelHistory = channelList.getChannelHistory(channel);
           boolean success = channelHistory != null;
-          response = HTTP200 + getChannelHistoryResponse(channelHistory, success);
+          response = getChannelHistoryResponse(channelHistory, success);
+          response = buildFullJSONResponse(response);
         }else {
           response = HTTP400;
         }
@@ -138,7 +143,7 @@ public class MessageServerAPIHelper implements Runnable {
       }
     }
     buffer.append("]");
-    buffer.append("}\n");
+    buffer.append("}");
     return buffer.toString();
   }
 
@@ -156,7 +161,8 @@ public class MessageServerAPIHelper implements Runnable {
         String text = urlParamsMap.get("text");
         if (channel != null && text != null){
           channelList.postMessage(channel, text);
-          response = HTTP200 + getSuccessResponse(true);
+          response = getSuccessResponse(true);
+          response = buildFullJSONResponse(response);
         }else {
           response = HTTP400;
         }
@@ -174,7 +180,14 @@ public class MessageServerAPIHelper implements Runnable {
     StringBuffer buffer = new StringBuffer();
     buffer.append("{");
     buffer.append("\"success\":" + success + "");
-    buffer.append("}\n");
+    buffer.append("}");
     return buffer.toString();
+  }
+
+  /**
+   * Returns the full HTTP Response with full headers
+   * */
+  public String buildFullJSONResponse(String json){
+    return HTTP200 + CONTENT_TYPE + CONTENT_LENGTH + json.length() + "\n\r\n" + json;
   }
 }
