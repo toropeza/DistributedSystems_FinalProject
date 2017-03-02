@@ -1,9 +1,12 @@
+import DataModel.MessageChannelList;
+import util.WorkQueue;
+
 import java.net.Socket;
 
 /**
  * API provided by Message Server
  */
-public class MessageServerAPI {
+public class DataServerAPI {
 
   //Lists of channels and their postings
   private MessageChannelList messageChannelList;
@@ -11,7 +14,7 @@ public class MessageServerAPI {
   //Queue of runnables executed by Threads
   private WorkQueue workQueue;
 
-  public MessageServerAPI(){
+  public DataServerAPI(){
     messageChannelList = new MessageChannelList();
     workQueue = new WorkQueue();
   }
@@ -20,6 +23,6 @@ public class MessageServerAPI {
    * Asynchronously parses the incoming connection
    * */
   public void parseAPIRequest(Socket socketConnection){
-    workQueue.execute(new MessageServerAPIHelper(socketConnection, messageChannelList));
+    workQueue.execute(new DataServerAPIHelper(socketConnection, messageChannelList));
   }
 }

@@ -1,9 +1,20 @@
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+import sun.net.www.protocol.http.HttpURLConnection;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.HashMap;
 
 /**
  * Helper class for parsing HTTP methods
  */
 public class HTTPHelper {
+
+  static final Logger logger = LogManager.getLogger(WebServer.class);
 
   private final String HTTP_GET = "GET";
 
@@ -45,6 +56,49 @@ public class HTTPHelper {
       }
     }
     return urlParamsMap;
+  }
+
+  /**
+   * Performs an HTTP GET on the given URL returning response
+   *
+   * @param urlString The URL to query
+   * @return The string response
+   */
+  public String performHttpGet(String urlString) {
+    return performHTTPMethod(urlString, HTTP_GET);
+  }
+
+  /**
+   * Private helper method that will perform the given HTTP Method on the given URL
+   * Will be called by the other methods
+   * @param urlString The URL for the HTTP Request
+   * @param httpMethod The HTTP method to perform
+   * */
+  private String performHTTPMethod(String urlString, String httpMethod){
+    //Builder for the response
+    StringBuilder stringBuilder = new StringBuilder();
+
+    HttpURLConnection httpURLConnection;
+    try {
+      URL url = new URL(urlString);
+      httpURLConnection = (HttpURLConnection) url.openConnection();
+      httpURLConnection.setRequestMethod(httpMethod);
+      httpURLConnection.setRequestProperty("Content-Type", "application/json");
+
+      //Build String Response
+
+      BufferedReader reader = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream()));
+      String line;
+      while ((line = reader.readLine()) != null){
+        stringBuilder.append(line);
+      }
+
+    } catch (MalformedURLException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return stringBuilder.toString();
   }
 
 }

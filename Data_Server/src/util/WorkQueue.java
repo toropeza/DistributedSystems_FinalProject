@@ -1,7 +1,9 @@
+package util;
+
 import java.util.LinkedList;
 
 /**
- * WorkQueue maintains a thread pool for executing Runnables
+ * util.WorkQueue maintains a thread pool for executing Runnables
  * */
 public class WorkQueue {
 
@@ -21,7 +23,7 @@ public class WorkQueue {
     }
 
     /**
-     * @param threads the amount of threads to run in the WorkQueue
+     * @param threads the amount of threads to run in the util.WorkQueue
      */
     public WorkQueue(int threads) {
         if (threads < 1) {
