@@ -32,10 +32,12 @@ public class MessageChannelList {
    * */
   public long freshVersion(long currentVersion){
     long upToDateVersion;
-    long channelListVersion = getVersionNumber();
+    readWriteLock.lockRead();
+    long channelListVersion = versionNumber;
+    readWriteLock.unlockRead();
     if (currentVersion < channelListVersion){
       upToDateVersion = channelListVersion;
-    }else {
+    } else {
       upToDateVersion = currentVersion;
     }
     return upToDateVersion;
@@ -49,8 +51,16 @@ public class MessageChannelList {
     Object[] channelHistory = null;
     readWriteLock.lockRead();
     if (channelPostings.containsKey(channelName)){
-      //Return thread safe array
-      channelHistory = channelPostings.get(channelName).toArray();
+      //deep copy
+      ArrayList<ChannelPosting> copiedHistory = new ArrayList<>();
+      List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
+      for (ChannelPosting channelPosting: referencedHistory){
+        long id = channelPosting.getId();
+        String text = channelPosting.getText();
+        ChannelPosting copiedPosting = new ChannelPosting(id, text);
+        copiedHistory.add(copiedPosting);
+      }
+      channelHistory = copiedHistory.toArray();
     }
     readWriteLock.unlockRead();
     return channelHistory;
@@ -64,13 +74,15 @@ public class MessageChannelList {
     Object[] starredChannelHistory = null;
     readWriteLock.lockRead();
     if (channelPostings.containsKey(channelName)){
-      //Return thread safe array
+      //Return thread safe "deep copy"
       ArrayList<Object> starredHistoryList = new ArrayList<>();
-      Object[] channelHistory = channelPostings.get(channelName).toArray();
-      for (Object object: channelHistory){
-        ChannelPosting posting = (ChannelPosting) object;
-        if (posting.isStarred()){
-          starredHistoryList.add(posting);
+      List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
+      for (ChannelPosting referencedPosting: referencedHistory){
+        if (referencedPosting.isStarred()){
+          long id = referencedPosting.getId();
+          String text = referencedPosting.getText();
+          ChannelPosting copiedPosting = new ChannelPosting(id, text);
+          starredHistoryList.add(copiedPosting);
         }
       }
       starredChannelHistory = starredHistoryList.toArray();
@@ -87,21 +99,20 @@ public class MessageChannelList {
    * @return the id associated with the posting
    * */
   public long postMessage(String channel, String message){
-    incrementIDCount();
-    incrementVersionNumber();
     readWriteLock.lockWrite();
-    long channelListIDCount = getMessageIDCount();
+    messageIDCount++;
+    versionNumber++;
     if (channelPostings.containsKey(channel)){
-      ChannelPosting posting = new ChannelPosting(channelListIDCount, message);
+      ChannelPosting posting = new ChannelPosting(messageIDCount, message);
       channelPostings.get(channel).add(posting);
     }else {
       List<ChannelPosting> channelList = Collections.synchronizedList(new ArrayList<>());
-      ChannelPosting posting = new ChannelPosting(channelListIDCount, message);
+      ChannelPosting posting = new ChannelPosting(messageIDCount, message);
       channelList.add(posting);
       channelPostings.put(channel, channelList);
     }
     readWriteLock.unlockWrite();
-    return channelListIDCount;
+    return messageIDCount;
   }
 
   /**
@@ -111,9 +122,9 @@ public class MessageChannelList {
    * @return Whether the message was successfully starred or not
    * */
   public boolean starMessage(String messageId){
-    incrementVersionNumber();
     boolean starredSuccessful = false;
     readWriteLock.lockWrite();
+    versionNumber++;
     for (String channel: channelPostings.keySet()){
       for (ChannelPosting channelPosting: channelPostings.get(channel)){
         if (String.valueOf(channelPosting.getId()).equals(messageId)){
@@ -128,33 +139,5 @@ public class MessageChannelList {
     }
     readWriteLock.unlockWrite();
     return starredSuccessful;
-  }
-
-  /**
-   * Thread safe method for accessing the message ID Count
-   * */
-  public synchronized long getMessageIDCount() {
-    return messageIDCount;
-  }
-
-  /**
-   * Thread safe method for incrementing message ID Count
-   * */
-  public synchronized void incrementIDCount() {
-    this.messageIDCount++;
-  }
-
-  /**
-   * Thread safe method for accessing the DB Version number
-   * */
-  public synchronized long getVersionNumber() {
-    return versionNumber;
-  }
-
-  /**
-   * Thread safe method for incrementing the DB Version number
-   * */
-  public synchronized void incrementVersionNumber() {
-    this.versionNumber++;
   }
 }

@@ -30,12 +30,14 @@ public class MessageCache {
     Object[] starredChannelHistory = null;
     readWriteLock.lockRead();
     if (channelPostings.containsKey(channelName)){
-      //Return new reference to release read lock
-      starredChannelHistory = channelPostings.get(channelName).toArray();
+      //Deep Copy
+      List<ChannelPosting> referencedhistory = channelPostings.get(channelName);
       ArrayList<Object> starredPostingList = new ArrayList<>();
-      for (Object object: starredChannelHistory){
-        ChannelPosting posting = (ChannelPosting) object;
-        starredPostingList.add(posting);
+      for (ChannelPosting referencedPosting: referencedhistory){
+        long id = referencedPosting.getId();
+        String text = referencedPosting.getText();
+        ChannelPosting copiedChannelPosting = new ChannelPosting(id, text);
+        starredPostingList.add(copiedChannelPosting);
       }
       starredChannelHistory = starredPostingList.toArray();
     }
@@ -44,27 +46,21 @@ public class MessageCache {
   }
 
   public void updateCache(long newVersion, String channel, ChannelPosting[] freshData){
-    setVersionNumber(newVersion);
     ArrayList<ChannelPosting> newStarredPostings = new ArrayList<>();
     for (ChannelPosting channelPosting: freshData){
       newStarredPostings.add(channelPosting);
     }
     readWriteLock.lockWrite();
+    versionNumber = newVersion;
     channelPostings.put(channel, newStarredPostings);
     readWriteLock.unlockWrite();
   }
 
-  /**
-   * Thread safe method for accessing the cache Version number
-   * */
-  public synchronized long getVersionNumber() {
-    return versionNumber;
-  }
-
-  /**
-   * Thread safe method for setting the cache Version number
-   * */
-  public synchronized void setVersionNumber(long versionNumber) {
-    this.versionNumber = versionNumber;
+  public long getVersionNumber(){
+    long version;
+    readWriteLock.lockRead();
+    version = versionNumber;
+    readWriteLock.unlockRead();
+    return version;
   }
 }
