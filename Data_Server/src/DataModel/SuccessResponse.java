@@ -1,11 +1,11 @@
-package GsonModels.ResponseModels;
+package DataModel;
 
 /**
- * Created by thomasoropeza on 2/20/17.
+ * Returns a success response with either true/false
  */
-public class StarMessageResponse {
+public class SuccessResponse {
 
-  private boolean success;
+  boolean success;
 
   public boolean isSuccess() {
     return success;

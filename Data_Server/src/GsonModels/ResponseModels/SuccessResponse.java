@@ -9,4 +9,8 @@ public class SuccessResponse {
   public void setSuccess(boolean success) {
     this.success = success;
   }
+
+  public boolean isSuccess() {
+    return success;
+  }
 }

@@ -1,7 +1,7 @@
 package DataModel;
 
 /**
- * Created by thomasoropeza on 2/20/17.
+ * Information describing a channel's message posting
  */
 public class ChannelPosting {
 

@@ -4,7 +4,9 @@ import util.ReadWriteLock;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -23,6 +25,16 @@ public class MessageChannelList {
     channelPostings = new ConcurrentHashMap<>();
     messageIDCount = 0;
     versionNumber = 0;
+  }
+
+  /**
+   * Applies the given database.
+   * @param channelPostings The new database to add
+   */
+  public void addDatabase(Map<String, List<ChannelPosting>> channelPostings){
+    readWriteLock.lockWrite();
+    this.channelPostings.putAll(channelPostings);
+    readWriteLock.unlockWrite();
   }
 
   /**
@@ -51,15 +63,7 @@ public class MessageChannelList {
     Object[] channelHistory = null;
     readWriteLock.lockRead();
     if (channelPostings.containsKey(channelName)){
-      //deep copy
-      ArrayList<ChannelPosting> copiedHistory = new ArrayList<>();
-      List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
-      for (ChannelPosting channelPosting: referencedHistory){
-        long id = channelPosting.getId();
-        String text = channelPosting.getText();
-        ChannelPosting copiedPosting = new ChannelPosting(id, text);
-        copiedHistory.add(copiedPosting);
-      }
+      List<ChannelPosting> copiedHistory = deepCopyHistory(channelName);
       channelHistory = copiedHistory.toArray();
     }
     readWriteLock.unlockRead();
@@ -74,21 +78,74 @@ public class MessageChannelList {
     Object[] starredChannelHistory = null;
     readWriteLock.lockRead();
     if (channelPostings.containsKey(channelName)){
-      //Return thread safe "deep copy"
-      ArrayList<Object> starredHistoryList = new ArrayList<>();
-      List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
-      for (ChannelPosting referencedPosting: referencedHistory){
-        if (referencedPosting.isStarred()){
-          long id = referencedPosting.getId();
-          String text = referencedPosting.getText();
-          ChannelPosting copiedPosting = new ChannelPosting(id, text);
-          starredHistoryList.add(copiedPosting);
-        }
-      }
+      List<ChannelPosting> starredHistoryList = deepCopyStarredHistory(channelName);
       starredChannelHistory = starredHistoryList.toArray();
     }
     readWriteLock.unlockRead();
     return starredChannelHistory;
+  }
+
+  /**
+   * Thread safe method for retrieving a channel's database
+   * @return The Channel's database
+   * */
+  public Map<String, List<ChannelPosting>> getDatabase(){
+    Map<String, List<ChannelPosting>> database = null;
+    readWriteLock.lockRead();
+    database = deepCopyDatabase();
+    readWriteLock.unlockRead();
+    return database;
+  }
+
+  /**
+   * Returns a deep copy of the database for thread safety
+   * Used to reply to a spawning secondary server
+   * @return The deep copy of the database structure
+   */
+  private Map<String, List<ChannelPosting>> deepCopyDatabase(){
+    HashMap<String, List<ChannelPosting>> copiedDatabase = new HashMap<>();
+    for (String channelName: channelPostings.keySet()){
+      copiedDatabase.put(channelName, deepCopyHistory(channelName));
+    }
+    return copiedDatabase;
+  }
+
+  /**
+   * Returns a deep copy of the channel's history for thread safety
+   * Used to reply to a spawning secondary server
+   * @param channelName The channel to copy
+   * @return The deep copy of the channel's history
+   */
+  private List<ChannelPosting> deepCopyHistory(String channelName){
+    ArrayList<ChannelPosting> copiedHistory = new ArrayList<>();
+    List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
+    for (ChannelPosting channelPosting: referencedHistory){
+      long id = channelPosting.getId();
+      String text = channelPosting.getText();
+      ChannelPosting copiedPosting = new ChannelPosting(id, text);
+      copiedHistory.add(copiedPosting);
+    }
+    return copiedHistory;
+  }
+
+  /**
+   * Returns a deep copy of the channel's starred history for thread safety
+   * Used to reply to a spawning secondary server
+   * @param channelName The channel to copy
+   * @return The deep copy of the channel's starred history
+   */
+  private List<ChannelPosting> deepCopyStarredHistory(String channelName){
+    List<ChannelPosting> starredHistoryList = new ArrayList<>();
+    List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
+    for (ChannelPosting referencedPosting: referencedHistory){
+      if (referencedPosting.isStarred()){
+        long id = referencedPosting.getId();
+        String text = referencedPosting.getText();
+        ChannelPosting copiedPosting = new ChannelPosting(id, text);
+        starredHistoryList.add(copiedPosting);
+      }
+    }
+    return starredHistoryList;
   }
 
   /**

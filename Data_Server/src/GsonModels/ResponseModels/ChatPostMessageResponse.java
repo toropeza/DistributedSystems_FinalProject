@@ -8,6 +8,10 @@ public class ChatPostMessageResponse {
   private boolean success;
   private String id;
 
+  public boolean isSuccess() {
+    return success;
+  }
+
   public void setSuccess(boolean success) {
     this.success = success;
   }
