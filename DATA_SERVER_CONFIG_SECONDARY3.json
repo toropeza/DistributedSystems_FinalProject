@@ -1,0 +1,6 @@
+{
+  "server_type": "secondary",
+  "port":8080,
+  "primaryIp" : "127.0.0.1",
+  "primaryPort" : "8083"
+}

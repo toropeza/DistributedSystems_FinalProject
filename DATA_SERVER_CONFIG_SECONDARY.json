@@ -1,0 +1,7 @@
+{
+  "server_type": "secondary",
+  "port":8082,
+  "test": false,
+  "primaryIp" : "127.0.0.1",
+  "primaryPort" : "8083"
+}

@@ -1,0 +1,11 @@
+{
+  "server_type": "primary",
+  "port":8083,
+  "test": true,
+  "webservers":[
+    {
+      "ip":"127.0.0.1",
+      "port": 9000
+    }
+  ]
+}
