@@ -1,7 +1,5 @@
 import DataModel.WebServerInfo;
 import com.google.gson.Gson;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import util.JSONServerConfigModel;
 
 import java.io.BufferedReader;
@@ -12,13 +10,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 import java.util.TimerTask;
+import java.util.logging.Logger;
 
 /**
  * Message server that asynchronously handles various connections
  */
 public class DataServer {
 
-  static final Logger logger = LogManager.getLogger(DataServer.class);
+  static final Logger logger = Logger.getLogger(DataServer.class.getName());
   static final Gson gson = new Gson();
   static final String configFilename = "DATA_SERVER_CONFIG.json";
 
@@ -28,7 +27,7 @@ public class DataServer {
   public static void main(String[] args) {
     try {
       if (args.length == 0) {
-        logger.error("Please provide the config filename");
+        logger.warning("Please provide the config filename");
         System.exit(1);
       }
       BufferedReader reader = new BufferedReader(new FileReader(args[0]));
@@ -51,7 +50,7 @@ public class DataServer {
             if (webServerIps != null) {
               dataServerAPI.setWebServers(webServerIps);
             } else {
-              logger.error("No web servers found in config file, running lone data server");
+              logger.warning("No web servers found in config file, running lone data server");
             }
           } else if (serverType.equals(secondaryServerType)) {
             dataServerAPI.setSecondary(config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()));
@@ -71,9 +70,9 @@ public class DataServer {
       }
     } catch (FileNotFoundException e) {
       e.printStackTrace();
-      logger.error("Cannot find config file: " + configFilename);
+      logger.warning("Cannot find config file: " + configFilename);
     } catch (IOException e) {
-      logger.error("Cannot read config file");
+      logger.warning("Cannot read config file");
     }
   }
 

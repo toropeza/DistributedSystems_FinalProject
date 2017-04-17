@@ -1,5 +1,3 @@
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import sun.net.www.protocol.http.HttpURLConnection;
 
 import java.io.BufferedReader;
@@ -8,13 +6,14 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.logging.Logger;
 
 /**
  * Helper class for parsing HTTP methods
  */
 public class HTTPHelper {
 
-  static final Logger logger = LogManager.getLogger(WebServer.class);
+  static final Logger logger = Logger.getLogger(WebServer.class.getName());
 
   private final String HTTP_GET = "GET";
 

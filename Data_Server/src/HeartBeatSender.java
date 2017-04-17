@@ -7,20 +7,19 @@ import DataModel.WebServerList;
 import GsonModels.ResponseModels.SuccessResponse;
 import GsonModels.ResponseModels.UpdateDataResponse;
 import com.google.gson.Gson;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Map;
 import java.util.TimerTask;
+import java.util.logging.Logger;
 
 /**
  * Constantly sends heartbeats between Data Servers
  */
 public class HeartBeatSender extends TimerTask{
 
-  static final Logger logger = LogManager.getLogger(DataServer.class);
+  static final Logger logger = Logger.getLogger(DataServer.class.getName());
 
   public static final int TIME_TO_SEND = 10000;
   public static final int TIME_TO_EXPIRE = 5000;

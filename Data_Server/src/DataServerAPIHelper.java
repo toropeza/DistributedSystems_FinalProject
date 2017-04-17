@@ -13,8 +13,6 @@ import GsonModels.ResponseModels.StarredChannelHistoryResponse;
 import GsonModels.ResponseModels.SuccessResponse;
 import GsonModels.ResponseModels.UpdateDataResponse;
 import com.google.gson.Gson;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -26,13 +24,14 @@ import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Runnable Class that parses the Requests coming into the MessageServerAPI
  * */
 public class DataServerAPIHelper implements Runnable {
 
-  static final Logger logger = LogManager.getLogger(DataServer.class);
+  static final Logger logger = Logger.getLogger(DataServer.class.getName());
 
   private final int ELECTION_TIMEOUT = 5000;
 
@@ -390,7 +389,7 @@ public class DataServerAPIHelper implements Runnable {
     if (success){
       logger.info("All Secondary Data Servers notified of new Web Server");
     }else {
-      logger.error("There was an error notifying secondary Data Servers of new Web Server");
+      logger.warning("There was an error notifying secondary Data Servers of new Web Server");
     }
     String json = getSuccessResponse(success);
     String response = httpHelper.buildHTTPResponse(json);

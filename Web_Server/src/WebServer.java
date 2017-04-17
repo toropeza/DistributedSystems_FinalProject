@@ -1,18 +1,17 @@
 import ResponseModels.SuccessResponse;
 import com.google.gson.Gson;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.logging.Logger;
 
 /**
  * Message server that asynchronously handles various connections
  */
 public class WebServer {
 
-  static final Logger logger = LogManager.getLogger(WebServer.class);
+  static final Logger logger = Logger.getLogger(WebServer.class.getName());
 
   final static String portParam = "-port";
   final static String dataServerIPParam = "-dsip";
@@ -50,7 +49,7 @@ public class WebServer {
             e.printStackTrace();
           }
         }else {
-          logger.error("Received failure response from primary Data Server");
+          logger.warning("Received failure response from primary Data Server");
         }
       }
     }else {

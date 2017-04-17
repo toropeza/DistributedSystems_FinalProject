@@ -7,8 +7,6 @@ import DataModel.WebServerList;
 import GsonModels.ResponseModels.NewSecondaryResponse;
 import GsonModels.ResponseModels.SuccessResponse;
 import com.google.gson.Gson;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import util.WorkQueue;
 
 import java.io.BufferedReader;
@@ -21,13 +19,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
+import java.util.logging.Logger;
 
 /**
  * API provided by Message Server
  */
 public class DataServerAPI {
 
-  static final Logger logger = LogManager.getLogger(DataServer.class);
+  static final Logger logger = Logger.getLogger(DataServer.class.getName());
 
   //Lists of channels and their postings
   private MessageChannelList messageChannelList;

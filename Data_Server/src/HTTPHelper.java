@@ -1,23 +1,20 @@
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import sun.net.www.protocol.http.HttpURLConnection;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.HashMap;
-import java.util.TimerTask;
+import java.util.logging.Logger;
 
 /**
  * Helper class for parsing HTTP methods
  */
 public class HTTPHelper {
 
-  static final Logger logger = LogManager.getLogger(DataServer.class);
+  static final Logger logger = Logger.getLogger(DataServer.class.getName());
 
   private final String HTTP_GET = "GET";
   private final long timeoutValue = 800;

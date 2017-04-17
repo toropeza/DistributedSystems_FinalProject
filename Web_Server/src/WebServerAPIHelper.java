@@ -4,8 +4,6 @@ import ResponseModels.ChannelsHistoryResponse;
 import ResponseModels.DSChannelsStarResponse;
 import ResponseModels.SuccessResponse;
 import com.google.gson.Gson;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -14,13 +12,14 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.util.HashMap;
+import java.util.logging.Logger;
 
 /**
  * Runnable Class that parses the Requests coming into the MessageServerAPI
  * */
 public class WebServerAPIHelper implements Runnable {
 
-  static final Logger logger = LogManager.getLogger(WebServer.class);
+  static final Logger logger = Logger.getLogger(WebServer.class.getName());
 
   //HTTP Response Codes
   private final String HTTP200 = "HTTP/1.1 200 OK\n";
