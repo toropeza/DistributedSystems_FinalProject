@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MessageChannelList {
 
   private final ReadWriteLock readWriteLock;
-  private final ConcurrentHashMap<String, List<ChannelPosting>> channelPostings;
+  private ConcurrentHashMap<String, List<ChannelPosting>> channelPostings;
   private long messageIDCount;
   private long versionNumber;
 
@@ -38,6 +38,17 @@ public class MessageChannelList {
   }
 
   /**
+   * Sets the given database.
+   * @param channelPostings The new database to add
+   */
+  public void setDatabase(Map<String, List<ChannelPosting>> channelPostings){
+    readWriteLock.lockWrite();
+    this.channelPostings = new ConcurrentHashMap<>();
+    channelPostings.putAll(channelPostings);
+    readWriteLock.unlockWrite();
+  }
+
+  /**
    * Returns the most up-to-date version number. Will return the passed in version if up to date
    * @param currentVersion The version of the Web Server
    * @return The most up-to-date version number.
@@ -53,6 +64,17 @@ public class MessageChannelList {
       upToDateVersion = currentVersion;
     }
     return upToDateVersion;
+  }
+
+  /**
+   * @return The version number
+   */
+  public long versionNumber(){
+    long version;
+    readWriteLock.lockRead();
+    version = versionNumber;
+    readWriteLock.unlockRead();
+    return version;
   }
 
   /**

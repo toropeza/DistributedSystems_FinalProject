@@ -70,11 +70,15 @@ public class DataServerAPI {
   //primary data server's port
   public static int primaryPort;
 
+  //whether this instance is testing or not
+  public static boolean testing;
+
   /**
    * Creates a new Data Server
    */
-  public DataServerAPI(int port){
+  public DataServerAPI(int port, boolean testing){
     this.port = port;
+    this.testing = testing;
     messageChannelList = new MessageChannelList();
     webServers = new WebServerList();
     dataServers = new DataServerList();
@@ -82,7 +86,7 @@ public class DataServerAPI {
     cachedRequests = new ArrayList<>();
     gson = new Gson();
     isElecting = false;
-    timer.schedule(new HeartBeatSender(dataServers, webServers), 0, HeartBeatSender.TIME_TO_SEND);
+    timer.schedule(new HeartBeatSender(dataServers, webServers, messageChannelList), 0, HeartBeatSender.TIME_TO_SEND);
   }
 
   /**

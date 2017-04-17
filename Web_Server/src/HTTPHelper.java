@@ -64,7 +64,7 @@ public class HTTPHelper {
    * @param urlString The URL to query
    * @return The string response
    */
-  public String performHttpGet(String urlString) {
+  public String performHttpGet(String urlString) throws Exception{
     return performHTTPMethod(urlString, HTTP_GET);
   }
 
@@ -74,7 +74,7 @@ public class HTTPHelper {
    * @param urlString The URL for the HTTP Request
    * @param httpMethod The HTTP method to perform
    * */
-  private String performHTTPMethod(String urlString, String httpMethod){
+  private String performHTTPMethod(String urlString, String httpMethod) throws Exception{
     //Builder for the response
     StringBuilder stringBuilder = new StringBuilder();
 
@@ -96,7 +96,7 @@ public class HTTPHelper {
     } catch (MalformedURLException e) {
       e.printStackTrace();
     } catch (IOException e) {
-      e.printStackTrace();
+      throw new Exception("unable to connect");
     }
     return stringBuilder.toString();
   }

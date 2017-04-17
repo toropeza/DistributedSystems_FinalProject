@@ -11,6 +11,7 @@ import GsonModels.ResponseModels.ChannelsHistoryResponse;
 import GsonModels.ResponseModels.ChatPostMessageResponse;
 import GsonModels.ResponseModels.StarredChannelHistoryResponse;
 import GsonModels.ResponseModels.SuccessResponse;
+import GsonModels.ResponseModels.UpdateDataResponse;
 import com.google.gson.Gson;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -47,6 +48,7 @@ public class DataServerAPIHelper implements Runnable {
   private final String heartBeatMethod = "routine.heartBeat";
   private final String electionMethod = "election.elect";
   private final String electionCoordinatorMethod = "election.coordinator";
+  private final String updateDataMethod = "update.data";
 
   //Socket connection for the request
   private Socket socket;
@@ -146,6 +148,8 @@ public class DataServerAPIHelper implements Runnable {
         }else if (method.equals(electionCoordinatorMethod)){
           parseElectionCoordinatorMessage(params);
           response = httpHelper.buildHTTPResponse(getSuccessResponse(true));
+        }else if (method.equals(updateDataMethod)){
+          response = getUpdateDataMethodResponse(params);
         }
       }else {
         //methods with no parameters
@@ -155,6 +159,50 @@ public class DataServerAPIHelper implements Runnable {
           response = httpHelper.buildHTTPResponse(getElectionAcceptResponse());
           sendElectionMessages();
         }
+      }
+    }
+    return response;
+  }
+
+  /**
+   * Returns the JSON Response for updating a data server's data
+   * @return The JSON Response
+   * */
+  public String getUpdateDataMethodResponse(String params){
+    String response = httpHelper.HTTP404;
+    if (params != null){
+      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
+      if (urlParamsMap != null && urlParamsMap.containsKey("version")){
+        String version = urlParamsMap.get("version");
+        if (version != null){
+          UpdateDataResponse updateDataResponse = new UpdateDataResponse();
+          boolean success = false;
+          try {
+            //add freshest version to response
+            long dataServerVersion = Long.valueOf(version);
+            long freshestVersion = channelList.freshVersion(dataServerVersion);
+            updateDataResponse.setVersion(String.valueOf(freshestVersion));
+
+            //Add History in response if version not up-to-date
+            if (freshestVersion != dataServerVersion){
+              logger.info("Data Server out of data, sending new database");
+              Map<String, List<ChannelPosting>> channelHistory = channelList.getDatabase();
+              success = channelHistory != null;
+              updateDataResponse.setData(channelHistory);
+            }else {
+              success = true;
+            }
+          }catch (NumberFormatException e){
+            success = false;
+          }
+          updateDataResponse.setSuccess(success);
+          String json = gson.toJson(updateDataResponse);
+          response = httpHelper.buildHTTPResponse(json);
+        }else {
+          response = httpHelper.HTTP400;
+        }
+      }else {
+        response = httpHelper.HTTP404;
       }
     }
     return response;
@@ -194,6 +242,24 @@ public class DataServerAPIHelper implements Runnable {
    * @return The JSON Response
    * */
   public void sendElectionMessages(){
+    //update data in case did not receive update
+    for (DataServerInfo info: dataServers.getDataServerInfo()){
+      long versionNum = channelList.versionNumber();
+      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
+      String response = httpHelper.performHttpGet(request);
+      UpdateDataResponse updateDataResponse = gson.fromJson(response, UpdateDataResponse.class);
+      if (updateDataResponse.isSuccess()){
+        if (!updateDataResponse.getVersion().equals(String.valueOf(versionNum))){
+          //data server cache is outdated, update database
+          logger.info("Data Server is Outdated. Version is " + versionNum);
+          long freshVersion = Long.valueOf(updateDataResponse.getVersion());
+          Map<String, List<ChannelPosting>> db = updateDataResponse.getData();
+          channelList.setDatabase(db);
+          logger.info("Data Server Cache. New Version is " + freshVersion);
+        }
+      }
+    }
+
     boolean encounteredResponse = false;
     List<DataServerInfo> higherNumberDS = dataServers.getHigherNumberServers(DataServerAPI.port);
     for (DataServerInfo info: higherNumberDS){
@@ -566,6 +632,11 @@ public class DataServerAPIHelper implements Runnable {
             logger.info("Forwarding request to secondaries");
             List<DataServerInfo> dataServerInfos = dataServers.getDataServerInfo();
             for (int i=0; i < dataServerInfos.size(); i++){
+              if (DataServerAPI.testing && i==0){
+                //skip first DS
+                logger.info("Testing: skipping first secondary post");
+                continue;
+              }
               DataServerInfo dataServer = dataServerInfos.get(i);
               String dsIp = dataServer.getIp();
               int dsPort = dataServer.getPort();
@@ -578,6 +649,11 @@ public class DataServerAPIHelper implements Runnable {
               }else {
                 logger.info("Secondary " + i + " successfully posted message");
               }
+            }
+            if (DataServerAPI.testing){
+              logger.info("Forwarded post to all but first data server.");
+              logger.info("Killing primary (self)");
+              System.exit(1);
             }
           }
           long messageID = channelList.postMessage(channel, text);

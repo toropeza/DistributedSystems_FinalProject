@@ -1,14 +1,18 @@
+import DataModel.ChannelPosting;
 import DataModel.DataServerInfo;
 import DataModel.DataServerList;
+import DataModel.MessageChannelList;
 import DataModel.WebServerInfo;
 import DataModel.WebServerList;
 import GsonModels.ResponseModels.SuccessResponse;
+import GsonModels.ResponseModels.UpdateDataResponse;
 import com.google.gson.Gson;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.Map;
 import java.util.TimerTask;
 
 /**
@@ -18,20 +22,23 @@ public class HeartBeatSender extends TimerTask{
 
   static final Logger logger = LogManager.getLogger(DataServer.class);
 
-  public static final int TIME_TO_SEND = 5000;
+  public static final int TIME_TO_SEND = 10000;
   public static final int TIME_TO_EXPIRE = 5000;
   private final int ELECTION_TIMEOUT = 5000;
   private HTTPHelper httpHelper;
   private Gson gson;
   private DataServerList dataServerList;
+  private MessageChannelList history;
   private WebServerList webServerList;
   private String requestMethod = "/api/routine.heartBeat";
   private final String electionMethod = "election.elect";
   private final String electionCoordinatorMethod = "election.coordinator";
+  private final String updateDataMethod = "update.data";
 
-  public HeartBeatSender(DataServerList dataServerList, WebServerList webServerList){
+  public HeartBeatSender(DataServerList dataServerList, WebServerList webServerList, MessageChannelList history){
     this.dataServerList = dataServerList;
     this.webServerList = webServerList;
+    this.history = history;
     httpHelper = new HTTPHelper();
     gson = new Gson();
   }
@@ -69,13 +76,32 @@ public class HeartBeatSender extends TimerTask{
   }
 
   /**
-   * TODO Implement Election algorithm
+   * Starts the election
    */
   private void startElection(){
     DataServerAPI.setElecting();
     logger.info("Failed to establish connection with primary data server");
     logger.info("Starting election algorithm");
-    //TODO send Election message
+
+    //update data in case did not receive update
+    for (DataServerInfo info: dataServerList.getDataServerInfo()){
+      long versionNum = history.versionNumber();
+      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
+      String response = httpHelper.performHttpGet(request);
+      UpdateDataResponse updateDataResponse = gson.fromJson(response, UpdateDataResponse.class);
+      if (updateDataResponse.isSuccess()){
+        if (!updateDataResponse.getVersion().equals(String.valueOf(versionNum))){
+          //data server cache is outdated, update database
+          logger.info("Data Server is Outdated. Version is " + versionNum);
+          long freshVersion = Long.valueOf(updateDataResponse.getVersion());
+          Map<String, List<ChannelPosting>> db = updateDataResponse.getData();
+          history.setDatabase(db);
+          logger.info("Data Server Cache. New Version is " + freshVersion);
+        }
+      }
+    }
+
+    //send Election message
     boolean encounteredResponse = false;
     List<DataServerInfo> higherNumberDS = dataServerList.getHigherNumberServers(DataServerAPI.port);
     for (DataServerInfo info: higherNumberDS){

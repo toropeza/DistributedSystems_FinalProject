@@ -35,10 +35,14 @@ public class DataServer {
       String jsonConfig = readFile(reader);
       JSONServerConfigModel config = gson.fromJson(jsonConfig, JSONServerConfigModel.class);
 
+      if (config.isTest()){
+        logger.info("Starting server as test server");
+        DataServerAPI.testing = true;
+      }
       int port = config.getPort();
       String serverType = config.getServer_type();
       if (serverType != null) {
-        DataServerAPI dataServerAPI = new DataServerAPI(port);
+        DataServerAPI dataServerAPI = new DataServerAPI(port, config.isTest());
 
         try (ServerSocket serverSocket = new ServerSocket(port);) {
           if (serverType.equals(primaryServerType)) {

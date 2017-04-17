@@ -168,31 +168,38 @@ public class WebServerAPIHelper implements Runnable {
         if (channel != null){
           String versionNumber = String.valueOf(starredMessageCache.getVersionNumber());
           String channelStarredHistoryRequest = buildDSChannelsStarRequest(channel, versionNumber);
-          String json = httpHelper.performHttpGet(channelStarredHistoryRequest);
-          DSChannelsStarResponse dsChannelsStarResponse = gson.fromJson(json, DSChannelsStarResponse.class);
+          try {
+            String json = httpHelper.performHttpGet(channelStarredHistoryRequest);
+            DSChannelsStarResponse dsChannelsStarResponse = gson.fromJson(json, DSChannelsStarResponse.class);
 
-          //Build the starred History response
-          ChannelsHistoryResponse starredChannelHistoryResponse = new ChannelsHistoryResponse();
-          if (dsChannelsStarResponse.isSuccess()){
-            starredChannelHistoryResponse.setSuccess(true);
-            //Serve starred messaged from cache or Data Server depending on version
-            if (!dsChannelsStarResponse.getVersion().equals(versionNumber)){
-              //web server cache is outdated, update cache
-              logger.info("Web Server Cache is Outdated. Version is " + versionNumber);
-              long freshVersion = Long.valueOf(dsChannelsStarResponse.getVersion());
-              ChannelPosting[] starredMessages = dsChannelsStarResponse.getMessages();
-              starredMessageCache.updateCache(freshVersion, channel, starredMessages);
-              logger.info("Web Server Cache Updated. New Version is " + freshVersion);
+            //Build the starred History response
+            ChannelsHistoryResponse starredChannelHistoryResponse = new ChannelsHistoryResponse();
+            if (dsChannelsStarResponse.isSuccess()){
+              starredChannelHistoryResponse.setSuccess(true);
+              //Serve starred messaged from cache or Data Server depending on version
+              if (!dsChannelsStarResponse.getVersion().equals(versionNumber)){
+                //web server cache is outdated, update cache
+                logger.info("Web Server Cache is Outdated. Version is " + versionNumber);
+                long freshVersion = Long.valueOf(dsChannelsStarResponse.getVersion());
+                ChannelPosting[] starredMessages = dsChannelsStarResponse.getMessages();
+                starredMessageCache.updateCache(freshVersion, channel, starredMessages);
+                logger.info("Web Server Cache Updated. New Version is " + freshVersion);
+              }else {
+                logger.info("Web Server Cache is up to Date. Serving from Cache");
+              }
+              //respond with fresh cache data
+              starredChannelHistoryResponse.setMessages(starredMessageCache.getChannelStarredHistory(channel));
             }else {
-              logger.info("Web Server Cache is up to Date. Serving from Cache");
+              starredChannelHistoryResponse.setSuccess(false);
             }
-            //respond with fresh cache data
-            starredChannelHistoryResponse.setMessages(starredMessageCache.getChannelStarredHistory(channel));
-          }else {
-            starredChannelHistoryResponse.setSuccess(false);
+            String starredChannelHistoryJSON = gson.toJson(starredChannelHistoryResponse);
+            response = buildHTTPResponse(starredChannelHistoryJSON);
+          }catch (Exception e){
+            SuccessResponse successResponse = new SuccessResponse();
+            successResponse.setSuccess(false);
+            response = buildHTTPResponse(gson.toJson(successResponse));
           }
-          String starredChannelHistoryJSON = gson.toJson(starredChannelHistoryResponse);
-          response = buildHTTPResponse(starredChannelHistoryJSON);
+
         }else {
           response = HTTP400;
         }
@@ -216,8 +223,14 @@ public class WebServerAPIHelper implements Runnable {
         String messageid = urlParamsMap.get("messageid");
         if (messageid != null){
           String starMessageRequest = buildDSStarMessageRequest(messageid);
-          String json = httpHelper.performHttpGet(starMessageRequest);
-          response = buildHTTPResponse(json);
+          try {
+            String json = httpHelper.performHttpGet(starMessageRequest);
+            response = buildHTTPResponse(json);
+          }catch (Exception e){
+            SuccessResponse successResponse = new SuccessResponse();
+            successResponse.setSuccess(false);
+            response = buildHTTPResponse(gson.toJson(successResponse));
+          }
         }else {
           response = HTTP400;
         }
@@ -240,9 +253,15 @@ public class WebServerAPIHelper implements Runnable {
       if (urlParamsMap != null && urlParamsMap.containsKey("channel")){
         String channel = urlParamsMap.get("channel");
         if (channel != null){
-          String channelHistoryRequest = buildDSChannelHistoryRequest(channel);
-          String json = httpHelper.performHttpGet(channelHistoryRequest);
-          response = buildHTTPResponse(json);
+          try {
+            String channelHistoryRequest = buildDSChannelHistoryRequest(channel);
+            String json = httpHelper.performHttpGet(channelHistoryRequest);
+            response = buildHTTPResponse(json);
+          }catch (Exception e){
+            SuccessResponse successResponse = new SuccessResponse();
+            successResponse.setSuccess(false);
+            response = buildHTTPResponse(gson.toJson(successResponse));
+          }
         }else {
           response = HTTP400;
         }
@@ -266,9 +285,15 @@ public class WebServerAPIHelper implements Runnable {
         String channel = urlParamsMap.get("channel");
         String text = urlParamsMap.get("text");
         if (channel != null && text != null){
-          String postMessageRequest = buildDSPostMessageRequest(channel, text);
-          String json = httpHelper.performHttpGet(postMessageRequest);
-          response = buildHTTPResponse(json);
+          try {
+            String postMessageRequest = buildDSPostMessageRequest(channel, text);
+            String json = httpHelper.performHttpGet(postMessageRequest);
+            response = buildHTTPResponse(json);
+          }catch (Exception e){
+            SuccessResponse successResponse = new SuccessResponse();
+            successResponse.setSuccess(false);
+            response = buildHTTPResponse(gson.toJson(successResponse));
+          }
         }else {
           response = HTTP400;
         }

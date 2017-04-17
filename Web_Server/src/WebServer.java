@@ -27,7 +27,12 @@ public class WebServer {
 
       //notify Data Server of Web Server
       String request = "http://" + dsIP + ":" + dsPort + "/api/config.newWebServer?port=" + port;
-      String response = new HTTPHelper().performHttpGet(request);
+      String response = null;
+      try {
+        response = new HTTPHelper().performHttpGet(request);
+      } catch (Exception e) {
+        
+      }
       SuccessResponse successResponse = new Gson().fromJson(response, SuccessResponse.class);
       if (successResponse != null){
         if (successResponse.isSuccess()){
