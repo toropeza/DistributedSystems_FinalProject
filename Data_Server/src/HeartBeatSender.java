@@ -1,5 +1,7 @@
 import DataModel.DataServerInfo;
 import DataModel.DataServerList;
+import DataModel.WebServerInfo;
+import DataModel.WebServerList;
 import GsonModels.ResponseModels.SuccessResponse;
 import com.google.gson.Gson;
 import org.apache.log4j.LogManager;
@@ -18,13 +20,18 @@ public class HeartBeatSender extends TimerTask{
 
   public static final int TIME_TO_SEND = 5000;
   public static final int TIME_TO_EXPIRE = 5000;
+  private final int ELECTION_TIMEOUT = 5000;
   private HTTPHelper httpHelper;
   private Gson gson;
   private DataServerList dataServerList;
+  private WebServerList webServerList;
   private String requestMethod = "/api/routine.heartBeat";
+  private final String electionMethod = "election.elect";
+  private final String electionCoordinatorMethod = "election.coordinator";
 
-  public HeartBeatSender(DataServerList dataServerList){
+  public HeartBeatSender(DataServerList dataServerList, WebServerList webServerList){
     this.dataServerList = dataServerList;
+    this.webServerList = webServerList;
     httpHelper = new HTTPHelper();
     gson = new Gson();
   }
@@ -39,19 +46,24 @@ public class HeartBeatSender extends TimerTask{
    * Will start election algorithm on heartbeat failure
    */
   private void sendHeartBeats() {
-    List<DataServerInfo> dataServerInfo = dataServerList.getDataServerInfo();
-    for (int i=0; i < dataServerInfo.size();i++){
-      DataServerInfo dataServer = dataServerInfo.get(i);
-      try {
-        String request = "http://" + dataServer.getIp() + ":" + dataServer.getPort() + requestMethod;
-        logger.info("Sending heartbeat to "+ dataServer.getIp() + ":" + dataServer.getPort());
-        String jsonResponse = httpHelper.performHttpGetWithTimeout(request, TIME_TO_EXPIRE);
-        SuccessResponse successResponse = gson.fromJson(jsonResponse, SuccessResponse.class);
-        if (successResponse.isSuccess()){
-          logger.info("Received heartbeat response from " + dataServer.getIp() + ":" + dataServer.getPort());
+    if (!DataServerAPI.isElecting){
+      List<DataServerInfo> dataServerInfo = dataServerList.getDataServerInfo();
+      for (int i=0; i < dataServerInfo.size();i++){
+        DataServerInfo dataServer = dataServerInfo.get(i);
+        try {
+          String request = "http://" + dataServer.getIp() + ":" + dataServer.getPort() + requestMethod;
+          logger.info("Sending heartbeat to "+ dataServer.getIp() + ":" + dataServer.getPort());
+          String jsonResponse = httpHelper.performHttpGetWithTimeout(request, TIME_TO_EXPIRE);
+          SuccessResponse successResponse = gson.fromJson(jsonResponse, SuccessResponse.class);
+          if (successResponse.isSuccess()){
+            logger.info("HBS:Received heartbeat response from " + dataServer.getIp() + ":" + dataServer.getPort());
+          }
+        }catch (SocketTimeoutException e){
+          //remove from membership and try next data server
+          dataServerList.removeDataServer(dataServer);
+          logger.info("No response from " + dataServer.getIp() + ":" + dataServer.getPort() + " removing from membership");
+          startElection();
         }
-      }catch (SocketTimeoutException e){
-        startElection();
       }
     }
   }
@@ -60,9 +72,39 @@ public class HeartBeatSender extends TimerTask{
    * TODO Implement Election algorithm
    */
   private void startElection(){
-    logger.info("Failed to esatblish connection with primary data server");
+    DataServerAPI.setElecting();
+    logger.info("Failed to establish connection with primary data server");
     logger.info("Starting election algorithm");
     //TODO send Election message
-
+    boolean encounteredResponse = false;
+    List<DataServerInfo> higherNumberDS = dataServerList.getHigherNumberServers(DataServerAPI.port);
+    for (DataServerInfo info: higherNumberDS){
+      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionMethod;
+      try {
+        //if received response, do nothing. Wait for coordinator message
+        String acceptResponse = httpHelper.performHttpGetWithTimeout(request, ELECTION_TIMEOUT);
+        encounteredResponse = true;
+      } catch (SocketTimeoutException e) {
+        //try next data server
+        dataServerList.removeDataServer(info);
+        logger.info("No response from " + info.getIp() + ":" + info.getPort() + " removing from membership");
+      }
+    }
+    if (!encounteredResponse){
+      //If there are no replies.. self elect
+      logger.info("No higher data servers replied, starting this isntance as new primary");
+      for (DataServerInfo info: dataServerList.getLowerNumberServers(DataServerAPI.port)){
+        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
+        httpHelper.performHttpGet(request);
+      }
+      logger.info("Notifying Web Servers");
+      //notify web servers
+      for (WebServerInfo info: webServerList.getWebServerInfo()){
+        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
+        httpHelper.performHttpGet(request);
+      }
+      DataServerAPI.setPrimary();
+      DataServerAPI.setNotElecting();
+    }
   }
 }

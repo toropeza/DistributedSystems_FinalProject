@@ -35,6 +35,7 @@ public class WebServerAPIHelper implements Runnable {
   private final String channelHistoryMethod = "channels.history";
   private final String messageStarMethod = "message.star";
   private final String channelStarMethod = "channels.star";
+  private final String electionCoordinatorMethod = "election.coordinator";
   private final String dataServerBaseURL;
 
   //Socket connection for the request
@@ -125,10 +126,32 @@ public class WebServerAPIHelper implements Runnable {
           response = starChannelMessage(params);
         }else if (method.equals(channelStarMethod)){
           response = getChannelStarredHistory(params);
+        }else if (method.equals(electionCoordinatorMethod)){
+          parseElectionCoordinatorMethod(params);
+          SuccessResponse successResponse = new SuccessResponse();
+          successResponse.setSuccess(true);
+          response = gson.toJson(successResponse);
         }
       }
     }
     return response;
+  }
+
+  /**
+   * Parses an election message for a new primary data server
+   * @param params The parameters from the REST call
+   * @return The JSON Response
+   * */
+  public void parseElectionCoordinatorMethod(String params){
+    if (params != null){
+      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
+      if (urlParamsMap != null && urlParamsMap.containsKey("newPrimaryPort")){
+        int newPrimaryPort = Integer.valueOf(urlParamsMap.get("newPrimaryPort"));
+        String newPrimaryIp = socket.getInetAddress().toString().replaceAll("/","");
+        WebServerAPI.setPrimaryData(newPrimaryIp, newPrimaryPort);
+        logger.info("New Primary : " + newPrimaryIp + ":" + newPrimaryPort + " added to membership");
+      }
+    }
   }
 
   /**

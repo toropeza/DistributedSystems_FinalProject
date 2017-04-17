@@ -59,7 +59,7 @@ public class DataServerList {
   /**
    * @return whether the Data Server List contains the given info
    */
-  public boolean containsDataServer(DataServerInfo dataServerInfo){
+  private boolean containsDataServer(DataServerInfo dataServerInfo){
     String ip = dataServerInfo.getIp();
     int port = dataServerInfo.getPort();
     boolean containsDataServer = false;
@@ -69,5 +69,62 @@ public class DataServerList {
       }
     }
     return containsDataServer;
+  }
+
+  /**
+   * Removes the given data server info
+   */
+  public void removeDataServer(DataServerInfo dataServer){
+    String ip = dataServer.getIp();
+    int port = dataServer.getPort();
+
+    readWriteLock.lockWrite();
+    for (int i=0; i < dataServerInfo.size(); i++){
+      DataServerInfo info = dataServerInfo.get(i);
+      if (info.getIp().equals(ip) && info.getPort() == port){
+        dataServerInfo.remove(info);
+      }
+    }
+    readWriteLock.unlockWrite();
+  }
+
+  /**
+   * Returns the servers who contain a server number higher than the given number
+   * @param port the server number of the current server
+   * @return the servers who contain a server number higher than the given number
+   */
+  public List<DataServerInfo> getHigherNumberServers(int port){
+    List<DataServerInfo> higherNumServers = new ArrayList<>();
+    readWriteLock.lockRead();
+    for (DataServerInfo info : dataServerInfo){
+      if (info.getPort() > port){
+        DataServerInfo copy = new DataServerInfo();
+        copy.setIp(info.getIp());
+        copy.setPort(info.getPort());
+        higherNumServers.add(copy);
+      }
+    }
+    readWriteLock.unlockRead();
+    return higherNumServers;
+  }
+
+  /**
+   * Returns the servers who contain a server number lower than the given number
+   * @param port the server number of the current server
+   * @return the servers who contain a server number lower than the given number
+   */
+  public List<DataServerInfo> getLowerNumberServers(int port){
+    List<DataServerInfo> higherNumServers = new ArrayList<>();
+    readWriteLock.lockRead();
+    for (DataServerInfo info : dataServerInfo){
+      if (info.getPort() < port){
+        DataServerInfo copy = new DataServerInfo();
+        copy.setIp(info.getIp());
+        copy.setPort(info.getPort());
+        higherNumServers.add(copy);
+      }
+    }
+    readWriteLock.unlockRead();
+    return higherNumServers;
   }
 }

@@ -82,7 +82,7 @@ public class HTTPHelper {
     try {
       response = performHTTPMethod(urlString, HTTP_GET, 0);
     } catch (SocketTimeoutException e) {
-      e.printStackTrace();
+
     }
     return response;
   }

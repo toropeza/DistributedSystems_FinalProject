@@ -52,27 +52,61 @@ public class DataServerAPI {
   //static reference for access in threads without reference to instance
   private static boolean isPrimary;
 
+  //represent whether the data server back-end is currently electing or not
+  public static boolean isElecting = false;
+
   //Collection for caching requests
   private ArrayList<String> cachedRequests;
 
+  //Port used to run this instance
+  public static int port;
+
+  //Timer used to send heartbeat messages
   Timer timer = new Timer();
 
-  public DataServerAPI(){
+  //primary data server's ip
+  public static String primaryIp;
+
+  //primary data server's port
+  public static int primaryPort;
+
+  /**
+   * Creates a new Data Server
+   */
+  public DataServerAPI(int port){
+    this.port = port;
     messageChannelList = new MessageChannelList();
     webServers = new WebServerList();
     dataServers = new DataServerList();
     workQueue = new WorkQueue();
     cachedRequests = new ArrayList<>();
     gson = new Gson();
-    timer.schedule(new HeartBeatSender(dataServers), 0, HeartBeatSender.TIME_TO_SEND);
+    isElecting = false;
+    timer.schedule(new HeartBeatSender(dataServers, webServers), 0, HeartBeatSender.TIME_TO_SEND);
   }
 
+  /**
+   * @return whether this is the primary data server at the moment
+   */
   public static boolean isPrimary() {
     return isPrimary;
   }
 
+  /**
+   * Sets this server as primary
+   */
   public static void setPrimary() {
     DataServerAPI.isPrimary = true;
+  }
+
+  /**
+   * Sets this node as a secondary
+   * @param primaryIp The primary's ip
+   * @param primaryPort The primary's port
+   */
+  public void setSecondary(String primaryIp, int primaryPort){
+    this.primaryIp = primaryIp;
+    this.primaryPort = primaryPort;
   }
 
   /**
@@ -105,9 +139,23 @@ public class DataServerAPI {
   public void parseAPIRequest(Socket socketConnection){
     if (isCaching()){
       cacheRequest(socketConnection);
-    }else {
+    } else {
       workQueue.execute(new DataServerAPIHelper(socketConnection, messageChannelList, webServers, dataServers));
     }
+  }
+
+  /**
+   * Sets the Data Server to currently be electing
+   */
+  public static synchronized void setElecting(){
+    isElecting = true;
+  }
+
+  /**
+   * Sets the Data Server to change to "not electing"
+   */
+  public static synchronized void setNotElecting(){
+    isElecting = false;
   }
 
   /**

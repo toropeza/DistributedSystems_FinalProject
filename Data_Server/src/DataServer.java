@@ -37,11 +37,8 @@ public class DataServer {
 
       int port = config.getPort();
       String serverType = config.getServer_type();
-
       if (serverType != null) {
-        DataServerAPI dataServerAPI = new DataServerAPI();
-        //TODO Use Timer Task for bully election timeouts
-        TimerTask task;
+        DataServerAPI dataServerAPI = new DataServerAPI(port);
 
         try (ServerSocket serverSocket = new ServerSocket(port);) {
           if (serverType.equals(primaryServerType)) {
@@ -53,6 +50,7 @@ public class DataServer {
               logger.error("No web servers found in config file, running lone data server");
             }
           } else if (serverType.equals(secondaryServerType)) {
+            dataServerAPI.setSecondary(config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()));
             dataServerAPI.queryPrimaryForData(port, config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()), config.isTest());
           }
 

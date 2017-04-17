@@ -4,6 +4,7 @@ import DataModel.DataServerList;
 import DataModel.MessageChannelList;
 import DataModel.WebServerInfo;
 import DataModel.WebServerList;
+import GsonModels.ResponseModels.ElectionAcceptResponse;
 import GsonModels.ResponseModels.NewSecondaryResponse;
 import GsonModels.ResponseModels.StarMessageResponse;
 import GsonModels.ResponseModels.ChannelsHistoryResponse;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +33,8 @@ public class DataServerAPIHelper implements Runnable {
 
   static final Logger logger = LogManager.getLogger(DataServer.class);
 
+  private final int ELECTION_TIMEOUT = 5000;
+
   //API Methods
   private final String postMessageMethod = "chat.postMessage";
   private final String channelHistoryMethod = "channels.history";
@@ -41,6 +45,8 @@ public class DataServerAPIHelper implements Runnable {
   private final String notifyNewWebServerMethod = "config.notifyNewWebServer";
   private final String notifyNewSecondaryServerMethod = "config.notifyNewDataServer";
   private final String heartBeatMethod = "routine.heartBeat";
+  private final String electionMethod = "election.elect";
+  private final String electionCoordinatorMethod = "election.coordinator";
 
   //Socket connection for the request
   private Socket socket;
@@ -137,15 +143,88 @@ public class DataServerAPIHelper implements Runnable {
           response = getConfigNewSecondaryResponse(params);
         }else if (method.equals(configNewWebServerMethod)){
           response = getConfigNewWebServerResponse(params);
+        }else if (method.equals(electionCoordinatorMethod)){
+          parseElectionCoordinatorMessage(params);
+          response = httpHelper.buildHTTPResponse(getSuccessResponse(true));
         }
       }else {
         //methods with no parameters
         if (method.equals(heartBeatMethod)){
           response = httpHelper.buildHTTPResponse(getSuccessResponse(true));
+        }else if (method.equals(electionMethod)){
+          response = httpHelper.buildHTTPResponse(getElectionAcceptResponse());
+          sendElectionMessages();
         }
       }
     }
     return response;
+  }
+
+  /**
+   * Parses the message indicating a new primary data server has been elected
+   * @param params
+   */
+  public void parseElectionCoordinatorMessage(String params){
+    if (params != null){
+      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
+      if (urlParamsMap != null && urlParamsMap.containsKey("newPrimaryPort")) {
+        //remove old primary info
+        DataServerInfo oldPrimaryInfo = new DataServerInfo();
+        oldPrimaryInfo.setPort(DataServerAPI.primaryPort);
+        oldPrimaryInfo.setIp(DataServerAPI.primaryIp);
+        dataServers.removeDataServer(oldPrimaryInfo);
+
+        //set new primary info
+        int newPrimaryPort = Integer.valueOf(urlParamsMap.get("newPrimaryPort"));
+        String newPrimaryIp = socket.getInetAddress().toString().replaceAll("/", "");
+        DataServerAPI.primaryPort = newPrimaryPort;
+        DataServerAPI.primaryIp = newPrimaryIp;
+        DataServerInfo newPrimaryInfo = new DataServerInfo();
+        newPrimaryInfo.setIp(newPrimaryIp);
+        newPrimaryInfo.setPort(newPrimaryPort);
+        dataServers.addDataServer(newPrimaryInfo);
+        logger.info("New Data Server Elected as primary, removing old from membership");
+        DataServerAPI.setNotElecting();
+      }
+    }
+  }
+
+  /**
+   * Returns the JSON Response for the start election method
+   * @return The JSON Response
+   * */
+  public void sendElectionMessages(){
+    boolean encounteredResponse = false;
+    List<DataServerInfo> higherNumberDS = dataServers.getHigherNumberServers(DataServerAPI.port);
+    for (DataServerInfo info: higherNumberDS){
+      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionMethod;
+      try {
+        //if received response, do nothing. Wait for coordinator message
+        String acceptResponse = httpHelper.performHttpGetWithTimeout(request, ELECTION_TIMEOUT);
+        encounteredResponse = true;
+      } catch (SocketTimeoutException e) {
+        //remove from membership and try next data server
+        dataServers.removeDataServer(info);
+        logger.info("No response from " + info.getIp() + ":" + info.getPort() + " removing from membership");
+      }
+    }
+    if (!encounteredResponse){
+      //If there are no replies.. self elect
+      logger.info("No higher data servers replied, starting this instance as new primary");
+      logger.info("Notifying Data Servers");
+      for (DataServerInfo info: dataServers.getLowerNumberServers(DataServerAPI.port)){
+        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
+        httpHelper.performHttpGet(request);
+      }
+      logger.info("Notifying Web Servers");
+      //notify web servers
+      for (WebServerInfo info: webServers.getWebServerInfo()){
+        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
+        httpHelper.performHttpGet(request);
+      }
+      DataServerAPI.setPrimary();
+      DataServerAPI.setNotElecting();
+    }
   }
 
   /**
@@ -532,6 +611,15 @@ public class DataServerAPIHelper implements Runnable {
     SuccessResponse successResponse = new SuccessResponse();
     successResponse.setSuccess(success);
     return gson.toJson(successResponse);
+  }
+
+  /**
+   * @return A JSON election "Accept" response
+   * */
+  public String getElectionAcceptResponse(){
+    ElectionAcceptResponse acceptResponse = new ElectionAcceptResponse();
+    acceptResponse.setAccept(true);
+    return gson.toJson(acceptResponse);
   }
 
   /**
