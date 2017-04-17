@@ -49,8 +49,8 @@ public class DataServerAPI {
   //static reference for access in threads without reference to instance
   private static boolean isPrimary;
 
-  //TODO implement caching for secondary that is booting up
-  private ArrayList<Socket> cachedRequests;
+  //Collection for caching requests
+  private ArrayList<String> cachedRequests;
 
   static final Logger logger = LogManager.getLogger(DataServer.class);
 
@@ -107,21 +107,43 @@ public class DataServerAPI {
   }
 
   /**
-   * TODO Implement caching
+   * Caches the request line to apply later and replies with a success message
    * @param socket
    */
   public void cacheRequest(Socket socket){
-    cachedRequests.add(socket);
+    try {
+      BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+      PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+
+      String line =  in.readLine();
+      if (line != null){
+        line = URLDecoder.decode(line, "UTF-8");
+        if (httpHelper.isHTTPGET(line)){
+          String request = httpHelper.getResource(line);
+          cachedRequests.add(request);
+          logger.info("Cached request: " + request);
+          SuccessResponse successResponse = new SuccessResponse();
+          successResponse.setSuccess(true);
+          String response = gson.toJson(successResponse);
+          out.write(httpHelper.buildHTTPResponse(response));
+        }
+        out.flush();
+        socket.close();
+      }
+    } catch (IOException e){
+      e.printStackTrace();
+    }
   }
 
   /**
-   * TODO implement caching
+   * Applies all of the requests currently cached to the database.
+   * Should be called after the database is updated
    */
   public void applyCachedRequests(){
     for (int i=0; i < cachedRequests.size(); i++){
-      Socket request = cachedRequests.get(i);
-      workQueue.execute(new DataServerAPIHelper(request, messageChannelList, webServers, dataServers));
-      logger.info("Applying cached request " + i);
+      String request = cachedRequests.get(i);
+      new DataServerAPIHelper(null, messageChannelList, webServers, dataServers).parseAPIRequest(request);
+      logger.info("Applying cached request " + request);
     }
   }
 
@@ -131,15 +153,15 @@ public class DataServerAPI {
    * @param primaryIp The primary's Ip Address
    * @param primaryPort The primary's Port
    */
-  public void queryPrimaryForData(int secondaryPort, String primaryIp, int primaryPort){
+  public void queryPrimaryForData(int secondaryPort, String primaryIp, int primaryPort, boolean test){
     //Contact primary for group membership list and database
-    String primaryBaseURL = "http://" + primaryIp + ":" + primaryPort + "/api/config.newSecondary?port=" + secondaryPort;
+    String primaryRequest = "http://" + primaryIp + ":" + primaryPort + "/api/config.newSecondary?port=" + secondaryPort;
     logger.info("Sending Secondary Data Server Request to Primary Data Server");
     Runnable newSecondaryTask = new Runnable() {
       @Override
       public void run() {
         setCaching(true);
-        String response = new HTTPHelper().performHttpGet(primaryBaseURL);
+        String response = new HTTPHelper().performHttpGet(primaryRequest);
         NewSecondaryResponse newSecondaryResponse = new Gson().fromJson(response, NewSecondaryResponse.class);
         List<WebServerInfo> webServerInfo = newSecondaryResponse.getWebServers();
         List<DataServerInfo> dataServerInfo = newSecondaryResponse.getDataServers();
@@ -152,6 +174,18 @@ public class DataServerAPI {
         logger.info("Data Servers: " + dataServerInfo);
         logger.info("Database: " + db.size() + " channels");
         logger.info("Secondary Data Server successfully set up");
+        if (test){
+          try {
+            logger.info("Waiting, send requests for caching!");
+            Object objectWaitLock = new Object();
+            synchronized (objectWaitLock){
+              objectWaitLock.wait(40000);
+            }
+            logger.info("No longer waiting!");
+          }catch (InterruptedException e){
+            e.printStackTrace();
+          }
+        }
         applyCachedRequests();
         setCaching(false);
       }
@@ -160,16 +194,14 @@ public class DataServerAPI {
   }
 
   /**
-   * TODO implement caching
-   * @return
+   * @return whether the Data Server is currently caching
    */
   public synchronized boolean isCaching() {
     return caching;
   }
 
   /**
-   * TODO implement caching
-   * @param caching
+   * Sets the Data Server to start/stop caching requests
    */
   public synchronized void setCaching(boolean caching) {
     this.caching = caching;

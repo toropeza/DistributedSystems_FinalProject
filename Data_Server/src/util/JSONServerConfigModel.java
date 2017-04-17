@@ -12,7 +12,12 @@ public class JSONServerConfigModel {
   String primaryIp;
   String primaryPort;
   int port;
+  boolean test;
   List<WebServerInfo> webservers;
+
+  public boolean isTest() {
+    return test;
+  }
 
   public String getServer_type() {
     return server_type;

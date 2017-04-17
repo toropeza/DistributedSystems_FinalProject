@@ -1,6 +1,4 @@
-import DataModel.ChannelPosting;
 import DataModel.WebServerInfo;
-import GsonModels.ResponseModels.NewSecondaryResponse;
 import com.google.gson.Gson;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -13,7 +11,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
-import java.util.Map;
 import java.util.TimerTask;
 
 /**
@@ -56,7 +53,7 @@ public class DataServer {
               logger.error("No web servers found in config file, running lone data server");
             }
           } else if (serverType.equals(secondaryServerType)) {
-            dataServerAPI.queryPrimaryForData(port, config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()));
+            dataServerAPI.queryPrimaryForData(port, config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()), config.isTest());
           }
 
           logger.info("Data Server Running");
