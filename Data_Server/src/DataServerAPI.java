@@ -15,17 +15,19 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
 
 /**
  * API provided by Message Server
  */
 public class DataServerAPI {
+
+  static final Logger logger = LogManager.getLogger(DataServer.class);
 
   //Lists of channels and their postings
   private MessageChannelList messageChannelList;
@@ -39,12 +41,13 @@ public class DataServerAPI {
   //Queue of runnables executed by Threads
   private WorkQueue workQueue;
 
-  HTTPHelper httpHelper = new HTTPHelper();
+  private HTTPHelper httpHelper = new HTTPHelper();
 
+  //specifies whether the Data Server is currently caching or not
   boolean caching = false;
 
   //Gson object for JSON parsing
-  Gson gson;
+  private Gson gson;
 
   //static reference for access in threads without reference to instance
   private static boolean isPrimary;
@@ -52,7 +55,7 @@ public class DataServerAPI {
   //Collection for caching requests
   private ArrayList<String> cachedRequests;
 
-  static final Logger logger = LogManager.getLogger(DataServer.class);
+  Timer timer = new Timer();
 
   public DataServerAPI(){
     messageChannelList = new MessageChannelList();
@@ -61,6 +64,7 @@ public class DataServerAPI {
     workQueue = new WorkQueue();
     cachedRequests = new ArrayList<>();
     gson = new Gson();
+    timer.schedule(new HeartBeatSender(dataServers), 0, HeartBeatSender.TIME_TO_SEND);
   }
 
   public static boolean isPrimary() {
@@ -165,6 +169,10 @@ public class DataServerAPI {
         NewSecondaryResponse newSecondaryResponse = new Gson().fromJson(response, NewSecondaryResponse.class);
         List<WebServerInfo> webServerInfo = newSecondaryResponse.getWebServers();
         List<DataServerInfo> dataServerInfo = newSecondaryResponse.getDataServers();
+        DataServerInfo primaryInfo = new DataServerInfo();
+        primaryInfo.setIp(primaryIp);
+        primaryInfo.setPort(primaryPort);
+        dataServerInfo.add(primaryInfo);
         Map<String, List<ChannelPosting>> db = newSecondaryResponse.getDatabase();
         setWebServers(webServerInfo);
         setDataServers(dataServerInfo);

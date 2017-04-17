@@ -40,6 +40,7 @@ public class DataServerAPIHelper implements Runnable {
   private final String configNewWebServerMethod = "config.newWebServer";
   private final String notifyNewWebServerMethod = "config.notifyNewWebServer";
   private final String notifyNewSecondaryServerMethod = "config.notifyNewDataServer";
+  private final String heartBeatMethod = "routine.heartBeat";
 
   //Socket connection for the request
   private Socket socket;
@@ -117,24 +118,31 @@ public class DataServerAPIHelper implements Runnable {
     if (path.length == 3){
       String[] methodAndParams = path[2].split("\\?");
       String method = methodAndParams[0];
-      //methods with parameters
-      String params = methodAndParams[1];
-      if (method.equals(postMessageMethod)){
-        response = postMessageToChannel(params);
-      }else if (method.equals(channelHistoryMethod)){
-        response = returnChannelHistory(params);
-      }else if (method.equals(messageStarMethod)){
-        response = starMessage(params);
-      }else if (method.equals(channelStarMethod)){
-        response = getChannelStarredHistory(params);
-      }else if (method.equals(notifyNewWebServerMethod)){
-        response = getNotifyNewWebServerResponse(params);
-      }else if (method.equals(notifyNewSecondaryServerMethod)){
-        response = getNotifyNewSecondaryServerResponse(params);
-      }else if (method.equals(configNewSecondaryMethod)){
-        response = getConfigNewSecondaryResponse(params);
-      }else if (method.equals(configNewWebServerMethod)){
-        response = getConfigNewWebServerResponse(params);
+      if (methodAndParams.length > 1){
+        //methods with parameters
+        String params = methodAndParams[1];
+        if (method.equals(postMessageMethod)){
+          response = postMessageToChannel(params);
+        }else if (method.equals(channelHistoryMethod)){
+          response = returnChannelHistory(params);
+        }else if (method.equals(messageStarMethod)){
+          response = starMessage(params);
+        }else if (method.equals(channelStarMethod)){
+          response = getChannelStarredHistory(params);
+        }else if (method.equals(notifyNewWebServerMethod)){
+          response = getNotifyNewWebServerResponse(params);
+        }else if (method.equals(notifyNewSecondaryServerMethod)){
+          response = getNotifyNewSecondaryServerResponse(params);
+        }else if (method.equals(configNewSecondaryMethod)){
+          response = getConfigNewSecondaryResponse(params);
+        }else if (method.equals(configNewWebServerMethod)){
+          response = getConfigNewWebServerResponse(params);
+        }
+      }else {
+        //methods with no parameters
+        if (method.equals(heartBeatMethod)){
+          response = httpHelper.buildHTTPResponse(getSuccessResponse(true));
+        }
       }
     }
     return response;

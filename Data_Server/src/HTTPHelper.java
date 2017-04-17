@@ -5,7 +5,9 @@ import sun.net.www.protocol.http.HttpURLConnection;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.ConnectException;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.TimerTask;
@@ -76,7 +78,24 @@ public class HTTPHelper {
    * @return The string response
    */
   public String performHttpGet(String urlString) {
-    return performHTTPMethod(urlString, HTTP_GET);
+    String response = null;
+    try {
+      response = performHTTPMethod(urlString, HTTP_GET, 0);
+    } catch (SocketTimeoutException e) {
+      e.printStackTrace();
+    }
+    return response;
+  }
+
+  /**
+   * Performs an HTTP GET on the given URL returning response or false on timeout
+   *
+   * @param urlString The URL to query
+   * @param timeoutValue The milliseconds to timeout after
+   * @return The string response
+   */
+  public String performHttpGetWithTimeout(String urlString, int timeoutValue) throws SocketTimeoutException {
+    return performHTTPMethod(urlString, HTTP_GET, timeoutValue);
   }
 
   /**
@@ -85,7 +104,7 @@ public class HTTPHelper {
    * @param urlString The URL for the HTTP Request
    * @param httpMethod The HTTP method to perform
    * */
-  private String performHTTPMethod(String urlString, String httpMethod){
+  private String performHTTPMethod(String urlString, String httpMethod, int timeoutValue) throws SocketTimeoutException{
     //Builder for the response
     StringBuilder stringBuilder = new StringBuilder();
 
@@ -96,6 +115,10 @@ public class HTTPHelper {
       httpURLConnection = (HttpURLConnection) url.openConnection();
       httpURLConnection.setRequestMethod(httpMethod);
       httpURLConnection.setRequestProperty("Content-Type", "application/json");
+
+      if (timeoutValue > 0){
+        httpURLConnection.setConnectTimeout(timeoutValue);
+      }
 
       //Build String Response
 
@@ -108,7 +131,7 @@ public class HTTPHelper {
     } catch (MalformedURLException e) {
       e.printStackTrace();
     } catch (IOException e) {
-      e.printStackTrace();
+      throw new SocketTimeoutException();
     }
     return stringBuilder.toString();
   }
