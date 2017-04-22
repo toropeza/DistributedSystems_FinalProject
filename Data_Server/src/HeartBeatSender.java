@@ -68,7 +68,17 @@ public class HeartBeatSender extends TimerTask{
           //remove from membership and try next data server
           dataServerList.removeDataServer(dataServer);
           logger.info("No response from " + dataServer.getIp() + ":" + dataServer.getPort() + " removing from membership");
-          startElection();
+          if (!DataServerAPI.isPrimary()){
+            String primaryIp = DataServerAPI.primaryInfo.getIp();
+            int primaryPort = DataServerAPI.primaryInfo.getPort();
+            logger.info("primaryIp:" + primaryIp);
+            logger.info("primaryPort:" + primaryPort);
+            if (dataServer.getIp().equals(primaryIp) && dataServer.getPort() == primaryPort){
+              startElection();
+            }
+          }else {
+            dataServerList.removeDataServer(dataServer);
+          }
         }
       }
     }
@@ -95,6 +105,7 @@ public class HeartBeatSender extends TimerTask{
           long freshVersion = Long.valueOf(updateDataResponse.getVersion());
           Map<String, List<ChannelPosting>> db = updateDataResponse.getData();
           history.setDatabase(db);
+          history.setVersionNumber(Integer.valueOf(updateDataResponse.getVersion()));
           logger.info("Data Server Cache. New Version is " + freshVersion);
         }
       }

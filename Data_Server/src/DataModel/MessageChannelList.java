@@ -8,12 +8,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 
 /**
  * Message Channel List is a Thread safe collection of channel postings
  */
 public class MessageChannelList {
+
+  static final Logger logger = Logger.getLogger(MessageChannelList.class.getName());
 
   private final ReadWriteLock readWriteLock;
   private ConcurrentHashMap<String, List<ChannelPosting>> channelPostings;
@@ -44,7 +47,7 @@ public class MessageChannelList {
   public void setDatabase(Map<String, List<ChannelPosting>> channelPostings){
     readWriteLock.lockWrite();
     this.channelPostings = new ConcurrentHashMap<>();
-    channelPostings.putAll(channelPostings);
+    this.channelPostings.putAll(channelPostings);
     readWriteLock.unlockWrite();
   }
 
@@ -190,6 +193,14 @@ public class MessageChannelList {
       channelList.add(posting);
       channelPostings.put(channel, channelList);
     }
+    logger.info("Database: " + channelPostings.size() + " channels");
+    for (String dbChannel: channelPostings.keySet()){
+      List<ChannelPosting> postings = channelPostings.get(dbChannel);
+      logger.info("Channel: " + dbChannel);
+      for (ChannelPosting posting: postings){
+        logger.info("    " + posting.getText());
+      }
+    }
     readWriteLock.unlockWrite();
     return messageIDCount;
   }
@@ -218,5 +229,12 @@ public class MessageChannelList {
     }
     readWriteLock.unlockWrite();
     return starredSuccessful;
+  }
+
+  public void setVersionNumber(long versionNumber){
+    readWriteLock.lockRead();
+    this.versionNumber = versionNumber;
+    this.messageIDCount = versionNumber;
+    readWriteLock.unlockRead();
   }
 }

@@ -15,6 +15,15 @@ public class NewSecondaryResponse {
   private Map<String, List<ChannelPosting>> database;
   private List<WebServerInfo> webServers;
   private List<DataServerInfo> dataServers;
+  private long versionNumber;
+
+  public long getVersionNumber() {
+    return versionNumber;
+  }
+
+  public void setVersionNumber(long versionNumber) {
+    this.versionNumber = versionNumber;
+  }
 
   public boolean isSuccess() {
     return success;

@@ -1,3 +1,4 @@
+import DataModel.DataServerInfo;
 import DataModel.WebServerInfo;
 import com.google.gson.Gson;
 import util.JSONServerConfigModel;
@@ -53,6 +54,10 @@ public class DataServer {
               logger.warning("No web servers found in config file, running lone data server");
             }
           } else if (serverType.equals(secondaryServerType)) {
+            DataServerInfo primaryInfo = new DataServerInfo();
+            primaryInfo.setPort(Integer.valueOf(config.getPrimaryPort()));
+            primaryInfo.setIp(config.getPrimaryIp());
+            DataServerAPI.primaryInfo = primaryInfo;
             dataServerAPI.setSecondary(config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()));
             dataServerAPI.queryPrimaryForData(port, config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()), config.isTest());
           }

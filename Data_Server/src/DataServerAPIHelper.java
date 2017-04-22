@@ -179,6 +179,7 @@ public class DataServerAPIHelper implements Runnable {
           try {
             //add freshest version to response
             long dataServerVersion = Long.valueOf(version);
+            long currentVersion = channelList.versionNumber();
             long freshestVersion = channelList.freshVersion(dataServerVersion);
             updateDataResponse.setVersion(String.valueOf(freshestVersion));
 
@@ -188,7 +189,39 @@ public class DataServerAPIHelper implements Runnable {
               Map<String, List<ChannelPosting>> channelHistory = channelList.getDatabase();
               success = channelHistory != null;
               updateDataResponse.setData(channelHistory);
-            }else {
+            } else if (dataServerVersion > currentVersion){
+              //update data in case did not receive update
+              Map<String, List<ChannelPosting>> channelPostings = channelList.getDatabase();
+              for (DataServerInfo info:dataServers.getDataServerInfo()){
+                long versionNum = channelList.versionNumber();
+                String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
+                try {
+                  String dsResponse = httpHelper.performHttpGetWithTimeout(request, ELECTION_TIMEOUT);
+                  UpdateDataResponse updateThisDataResponse = gson.fromJson(dsResponse, UpdateDataResponse.class);
+                  if (updateThisDataResponse.isSuccess()){
+                    if (!updateThisDataResponse.getVersion().equals(String.valueOf(versionNum))){
+                      //data server cache is outdated, update database
+                      logger.info("Data Server is Outdated. Version is " + versionNum);
+                      long freshVersion = Long.valueOf(updateThisDataResponse.getVersion());
+                      Map<String, List<ChannelPosting>> db = updateThisDataResponse.getData();
+                      channelList.setDatabase(db);
+                      channelList.setVersionNumber(Integer.valueOf(updateThisDataResponse.getVersion()));
+                      logger.info("Data Server Cache. New Version is " + freshVersion);
+                      logger.info("Database: " + channelPostings.size() + " channels");
+                      for (String dbChannel: channelPostings.keySet()){
+                        List<ChannelPosting> postings = channelPostings.get(dbChannel);
+                        logger.info("Channel: " + dbChannel);
+                        for (ChannelPosting posting: postings){
+                          logger.info("    " + posting.getText());
+                        }
+                      }
+                    }
+                  }
+                }catch (SocketTimeoutException e){
+
+                }
+              }
+            } else {
               success = true;
             }
           }catch (NumberFormatException e){
@@ -230,6 +263,7 @@ public class DataServerAPIHelper implements Runnable {
         newPrimaryInfo.setIp(newPrimaryIp);
         newPrimaryInfo.setPort(newPrimaryPort);
         dataServers.addDataServer(newPrimaryInfo);
+        DataServerAPI.primaryInfo = newPrimaryInfo;
         logger.info("New Data Server Elected as primary, removing old from membership");
         DataServerAPI.setNotElecting();
       }
@@ -241,24 +275,6 @@ public class DataServerAPIHelper implements Runnable {
    * @return The JSON Response
    * */
   public void sendElectionMessages(){
-    //update data in case did not receive update
-    for (DataServerInfo info: dataServers.getDataServerInfo()){
-      long versionNum = channelList.versionNumber();
-      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
-      String response = httpHelper.performHttpGet(request);
-      UpdateDataResponse updateDataResponse = gson.fromJson(response, UpdateDataResponse.class);
-      if (updateDataResponse.isSuccess()){
-        if (!updateDataResponse.getVersion().equals(String.valueOf(versionNum))){
-          //data server cache is outdated, update database
-          logger.info("Data Server is Outdated. Version is " + versionNum);
-          long freshVersion = Long.valueOf(updateDataResponse.getVersion());
-          Map<String, List<ChannelPosting>> db = updateDataResponse.getData();
-          channelList.setDatabase(db);
-          logger.info("Data Server Cache. New Version is " + freshVersion);
-        }
-      }
-    }
-
     boolean encounteredResponse = false;
     List<DataServerInfo> higherNumberDS = dataServers.getHigherNumberServers(DataServerAPI.port);
     for (DataServerInfo info: higherNumberDS){
@@ -289,6 +305,28 @@ public class DataServerAPIHelper implements Runnable {
       }
       DataServerAPI.setPrimary();
       DataServerAPI.setNotElecting();
+    }
+    //update data in case did not receive update
+    for (DataServerInfo info: dataServers.getDataServerInfo()){
+      long versionNum = channelList.versionNumber();
+      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
+      try {
+        String response = httpHelper.performHttpGetWithTimeout(request, ELECTION_TIMEOUT);
+        UpdateDataResponse updateDataResponse = gson.fromJson(response, UpdateDataResponse.class);
+        if (updateDataResponse.isSuccess()){
+          if (!updateDataResponse.getVersion().equals(String.valueOf(versionNum))){
+            //data server cache is outdated, update database
+            logger.info("Data Server is Outdated. Version is " + versionNum);
+            long freshVersion = Long.valueOf(updateDataResponse.getVersion());
+            Map<String, List<ChannelPosting>> db = updateDataResponse.getData();
+            channelList.setDatabase(db);
+            channelList.setVersionNumber(Integer.valueOf(updateDataResponse.getVersion()));
+            logger.info("Data Server Cache. New Version is " + freshVersion);
+          }
+        }
+      }catch (SocketTimeoutException e){
+
+      }
     }
   }
 
@@ -599,6 +637,7 @@ public class DataServerAPIHelper implements Runnable {
       response.setDatabase(db);
       response.setWebServers(webServerInfo);
       response.setDataServers(dataServerInfo);
+      response.setVersionNumber(channelList.versionNumber());
     }else {
       response.setSuccess(false);
     }

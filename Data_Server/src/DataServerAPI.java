@@ -51,6 +51,9 @@ public class DataServerAPI {
   //static reference for access in threads without reference to instance
   private static boolean isPrimary;
 
+  //static reference for access in threads without reference to instance
+  public static DataServerInfo primaryInfo;
+
   //represent whether the data server back-end is currently electing or not
   public static boolean isElecting = false;
 
@@ -227,11 +230,19 @@ public class DataServerAPI {
         Map<String, List<ChannelPosting>> db = newSecondaryResponse.getDatabase();
         setWebServers(webServerInfo);
         setDataServers(dataServerInfo);
-        addDatabase(db);
+        messageChannelList.setDatabase(db);
+        messageChannelList.setVersionNumber(newSecondaryResponse.getVersionNumber());
         logger.info("Primary Group Membership Received");
         logger.info("Web Servers: " + webServerInfo);
         logger.info("Data Servers: " + dataServerInfo);
         logger.info("Database: " + db.size() + " channels");
+        for (String channel: db.keySet()){
+          List<ChannelPosting> postings = db.get(channel);
+          logger.info("Channel: " + channel);
+          for (ChannelPosting posting: postings){
+            logger.info("    " + posting.getText());
+          }
+        }
         logger.info("Secondary Data Server successfully set up");
         if (test){
           try {
