@@ -1,5 +1,3 @@
-import DataModel.DataServerInfo;
-import DataModel.WebServerInfo;
 import com.google.gson.Gson;
 import util.JSONServerConfigModel;
 
@@ -9,8 +7,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.List;
-import java.util.TimerTask;
 import java.util.logging.Logger;
 
 /**
@@ -20,10 +16,8 @@ public class DataServer {
 
   static final Logger logger = Logger.getLogger(DataServer.class.getName());
   static final Gson gson = new Gson();
-  static final String configFilename = "DATA_SERVER_CONFIG.json";
 
-  static final String primaryServerType = "primary";
-  static final String secondaryServerType = "secondary";
+  private static String configFilename;
 
   public static void main(String[] args) {
     try {
@@ -31,48 +25,27 @@ public class DataServer {
         logger.warning("Please provide the config filename");
         System.exit(1);
       }
-      BufferedReader reader = new BufferedReader(new FileReader(args[0]));
+      configFilename = args[0];
+      BufferedReader reader = new BufferedReader(new FileReader(configFilename));
       String jsonConfig = readFile(reader);
       JSONServerConfigModel config = gson.fromJson(jsonConfig, JSONServerConfigModel.class);
 
-      if (config.isTest()){
-        logger.info("Starting server as test server");
-        DataServerAPI.testing = true;
-      }
       int port = config.getPort();
-      String serverType = config.getServer_type();
-      if (serverType != null) {
-        DataServerAPI dataServerAPI = new DataServerAPI(port, config.isTest());
+      DataServerAPI dataServerAPI = new DataServerAPI(port);
 
-        try (ServerSocket serverSocket = new ServerSocket(port);) {
-          if (serverType.equals(primaryServerType)) {
-            DataServerAPI.setPrimary();
-            List<WebServerInfo> webServerIps = config.getWebservers();
-            if (webServerIps != null) {
-              dataServerAPI.setWebServers(webServerIps);
-            } else {
-              logger.warning("No web servers found in config file, running lone data server");
-            }
-          } else if (serverType.equals(secondaryServerType)) {
-            DataServerInfo primaryInfo = new DataServerInfo();
-            primaryInfo.setPort(Integer.valueOf(config.getPrimaryPort()));
-            primaryInfo.setIp(config.getPrimaryIp());
-            DataServerAPI.primaryInfo = primaryInfo;
-            dataServerAPI.setSecondary(config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()));
-            dataServerAPI.queryPrimaryForData(port, config.getPrimaryIp(), Integer.valueOf(config.getPrimaryPort()), config.isTest());
-          }
+      try (ServerSocket serverSocket = new ServerSocket(port);) {
 
-          logger.info("Data Server Running");
-          //repeatedly wait for connections
-          while (true) {
-            Socket socket = serverSocket.accept();
-            logger.info("Accepted Request");
-            dataServerAPI.parseAPIRequest(socket);
-          }
-        } catch (IOException e) {
-          e.printStackTrace();
+        logger.info("Data Server Running");
+        //repeatedly wait for connections
+        while (true) {
+          Socket socket = serverSocket.accept();
+          logger.info("Accepted Request");
+          dataServerAPI.parseAPIRequest(socket);
         }
+      } catch (IOException e) {
+        e.printStackTrace();
       }
+
     } catch (FileNotFoundException e) {
       e.printStackTrace();
       logger.warning("Cannot find config file: " + configFilename);

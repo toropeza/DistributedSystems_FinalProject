@@ -42,20 +42,8 @@ public class DataServerAPI {
 
   private HTTPHelper httpHelper = new HTTPHelper();
 
-  //specifies whether the Data Server is currently caching or not
-  boolean caching = false;
-
   //Gson object for JSON parsing
   private Gson gson;
-
-  //static reference for access in threads without reference to instance
-  private static boolean isPrimary;
-
-  //static reference for access in threads without reference to instance
-  public static DataServerInfo primaryInfo;
-
-  //represent whether the data server back-end is currently electing or not
-  public static boolean isElecting = false;
 
   //Collection for caching requests
   private ArrayList<String> cachedRequests;
@@ -66,53 +54,18 @@ public class DataServerAPI {
   //Timer used to send heartbeat messages
   Timer timer = new Timer();
 
-  //primary data server's ip
-  public static String primaryIp;
-
-  //primary data server's port
-  public static int primaryPort;
-
-  //whether this instance is testing or not
-  public static boolean testing;
-
   /**
    * Creates a new Data Server
    */
-  public DataServerAPI(int port, boolean testing){
+  public DataServerAPI(int port){
     this.port = port;
-    this.testing = testing;
     messageChannelList = new MessageChannelList();
     webServers = new WebServerList();
     dataServers = new DataServerList();
     workQueue = new WorkQueue();
     cachedRequests = new ArrayList<>();
     gson = new Gson();
-    isElecting = false;
     timer.schedule(new HeartBeatSender(dataServers, webServers, messageChannelList), 0, HeartBeatSender.TIME_TO_SEND);
-  }
-
-  /**
-   * @return whether this is the primary data server at the moment
-   */
-  public static boolean isPrimary() {
-    return isPrimary;
-  }
-
-  /**
-   * Sets this server as primary
-   */
-  public static void setPrimary() {
-    DataServerAPI.isPrimary = true;
-  }
-
-  /**
-   * Sets this node as a secondary
-   * @param primaryIp The primary's ip
-   * @param primaryPort The primary's port
-   */
-  public void setSecondary(String primaryIp, int primaryPort){
-    this.primaryIp = primaryIp;
-    this.primaryPort = primaryPort;
   }
 
   /**
@@ -143,66 +96,8 @@ public class DataServerAPI {
    * Asynchronously parses the incoming connection
    * */
   public void parseAPIRequest(Socket socketConnection){
-    if (isCaching()){
-      cacheRequest(socketConnection);
-    } else {
-      workQueue.execute(new DataServerAPIHelper(socketConnection, messageChannelList, webServers, dataServers));
-    }
-  }
+    workQueue.execute(new DataServerAPIHelper(socketConnection, messageChannelList, webServers, dataServers));
 
-  /**
-   * Sets the Data Server to currently be electing
-   */
-  public static synchronized void setElecting(){
-    isElecting = true;
-  }
-
-  /**
-   * Sets the Data Server to change to "not electing"
-   */
-  public static synchronized void setNotElecting(){
-    isElecting = false;
-  }
-
-  /**
-   * Caches the request line to apply later and replies with a success message
-   * @param socket
-   */
-  public void cacheRequest(Socket socket){
-    try {
-      BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-      PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-
-      String line =  in.readLine();
-      if (line != null){
-        line = URLDecoder.decode(line, "UTF-8");
-        if (httpHelper.isHTTPGET(line)){
-          String request = httpHelper.getResource(line);
-          cachedRequests.add(request);
-          logger.info("Cached request: " + request);
-          SuccessResponse successResponse = new SuccessResponse();
-          successResponse.setSuccess(true);
-          String response = gson.toJson(successResponse);
-          out.write(httpHelper.buildHTTPResponse(response));
-        }
-        out.flush();
-        socket.close();
-      }
-    } catch (IOException e){
-      e.printStackTrace();
-    }
-  }
-
-  /**
-   * Applies all of the requests currently cached to the database.
-   * Should be called after the database is updated
-   */
-  public void applyCachedRequests(){
-    for (int i=0; i < cachedRequests.size(); i++){
-      String request = cachedRequests.get(i);
-      new DataServerAPIHelper(null, messageChannelList, webServers, dataServers).parseAPIRequest(request);
-      logger.info("Applying cached request " + request);
-    }
   }
 
   /**
@@ -218,7 +113,6 @@ public class DataServerAPI {
     Runnable newSecondaryTask = new Runnable() {
       @Override
       public void run() {
-        setCaching(true);
         String response = new HTTPHelper().performHttpGet(primaryRequest);
         NewSecondaryResponse newSecondaryResponse = new Gson().fromJson(response, NewSecondaryResponse.class);
         List<WebServerInfo> webServerInfo = newSecondaryResponse.getWebServers();
@@ -256,24 +150,8 @@ public class DataServerAPI {
             e.printStackTrace();
           }
         }
-        applyCachedRequests();
-        setCaching(false);
       }
     };
     workQueue.execute(newSecondaryTask);
-  }
-
-  /**
-   * @return whether the Data Server is currently caching
-   */
-  public synchronized boolean isCaching() {
-    return caching;
-  }
-
-  /**
-   * Sets the Data Server to start/stop caching requests
-   */
-  public synchronized void setCaching(boolean caching) {
-    this.caching = caching;
   }
 }

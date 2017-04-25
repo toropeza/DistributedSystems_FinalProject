@@ -87,44 +87,4 @@ public class DataServerList {
     }
     readWriteLock.unlockWrite();
   }
-
-  /**
-   * Returns the servers who contain a server number higher than the given number
-   * @param port the server number of the current server
-   * @return the servers who contain a server number higher than the given number
-   */
-  public List<DataServerInfo> getHigherNumberServers(int port){
-    List<DataServerInfo> higherNumServers = new ArrayList<>();
-    readWriteLock.lockRead();
-    for (DataServerInfo info : dataServerInfo){
-      if (info.getPort() > port){
-        DataServerInfo copy = new DataServerInfo();
-        copy.setIp(info.getIp());
-        copy.setPort(info.getPort());
-        higherNumServers.add(copy);
-      }
-    }
-    readWriteLock.unlockRead();
-    return higherNumServers;
-  }
-
-  /**
-   * Returns the servers who contain a server number lower than the given number
-   * @param port the server number of the current server
-   * @return the servers who contain a server number lower than the given number
-   */
-  public List<DataServerInfo> getLowerNumberServers(int port){
-    List<DataServerInfo> higherNumServers = new ArrayList<>();
-    readWriteLock.lockRead();
-    for (DataServerInfo info : dataServerInfo){
-      if (info.getPort() < port){
-        DataServerInfo copy = new DataServerInfo();
-        copy.setIp(info.getIp());
-        copy.setPort(info.getPort());
-        higherNumServers.add(copy);
-      }
-    }
-    readWriteLock.unlockRead();
-    return higherNumServers;
-  }
 }

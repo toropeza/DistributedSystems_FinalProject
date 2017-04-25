@@ -96,21 +96,6 @@ public class MessageChannelList {
   }
 
   /**
-   * Thread safe method for retrieving a channel's starred history
-   * @return The Channel's Starred History
-   * */
-  public Object[] getChannelStarredHistory(String channelName){
-    Object[] starredChannelHistory = null;
-    readWriteLock.lockRead();
-    if (channelPostings.containsKey(channelName)){
-      List<ChannelPosting> starredHistoryList = deepCopyStarredHistory(channelName);
-      starredChannelHistory = starredHistoryList.toArray();
-    }
-    readWriteLock.unlockRead();
-    return starredChannelHistory;
-  }
-
-  /**
    * Thread safe method for retrieving a channel's database
    * @return The Channel's database
    * */
@@ -154,26 +139,6 @@ public class MessageChannelList {
   }
 
   /**
-   * Returns a deep copy of the channel's starred history for thread safety
-   * Used to reply to a spawning secondary server
-   * @param channelName The channel to copy
-   * @return The deep copy of the channel's starred history
-   */
-  private List<ChannelPosting> deepCopyStarredHistory(String channelName){
-    List<ChannelPosting> starredHistoryList = new ArrayList<>();
-    List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
-    for (ChannelPosting referencedPosting: referencedHistory){
-      if (referencedPosting.isStarred()){
-        long id = referencedPosting.getId();
-        String text = referencedPosting.getText();
-        ChannelPosting copiedPosting = new ChannelPosting(id, text);
-        starredHistoryList.add(copiedPosting);
-      }
-    }
-    return starredHistoryList;
-  }
-
-  /**
    * Thread safe method for posting to a given channel.
    * If the channel does not exist it will be created.
    * @param channel The channel to post to
@@ -205,31 +170,6 @@ public class MessageChannelList {
     return messageIDCount;
   }
 
-  /**
-   * Thread safe method for starring a message
-   * If the message does not exist, will return false
-   * @param messageId The id of the message to star
-   * @return Whether the message was successfully starred or not
-   * */
-  public boolean starMessage(String messageId){
-    boolean starredSuccessful = false;
-    readWriteLock.lockWrite();
-    versionNumber++;
-    for (String channel: channelPostings.keySet()){
-      for (ChannelPosting channelPosting: channelPostings.get(channel)){
-        if (String.valueOf(channelPosting.getId()).equals(messageId)){
-          channelPosting.setStarred(true);
-          starredSuccessful = true;
-          break;
-        }
-      }
-      if (starredSuccessful){
-        break;
-      }
-    }
-    readWriteLock.unlockWrite();
-    return starredSuccessful;
-  }
 
   public void setVersionNumber(long versionNumber){
     readWriteLock.lockRead();

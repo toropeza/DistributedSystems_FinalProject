@@ -30,9 +30,6 @@ public class HeartBeatSender extends TimerTask{
   private MessageChannelList history;
   private WebServerList webServerList;
   private String requestMethod = "/api/routine.heartBeat";
-  private final String electionMethod = "election.elect";
-  private final String electionCoordinatorMethod = "election.coordinator";
-  private final String updateDataMethod = "update.data";
 
   public HeartBeatSender(DataServerList dataServerList, WebServerList webServerList, MessageChannelList history){
     this.dataServerList = dataServerList;
@@ -52,95 +49,23 @@ public class HeartBeatSender extends TimerTask{
    * Will start election algorithm on heartbeat failure
    */
   private void sendHeartBeats() {
-    if (!DataServerAPI.isElecting){
-      List<DataServerInfo> dataServerInfo = dataServerList.getDataServerInfo();
-      for (int i=0; i < dataServerInfo.size();i++){
-        DataServerInfo dataServer = dataServerInfo.get(i);
-        try {
-          String request = "http://" + dataServer.getIp() + ":" + dataServer.getPort() + requestMethod;
-          logger.info("Sending heartbeat to "+ dataServer.getIp() + ":" + dataServer.getPort());
-          String jsonResponse = httpHelper.performHttpGetWithTimeout(request, TIME_TO_EXPIRE);
-          SuccessResponse successResponse = gson.fromJson(jsonResponse, SuccessResponse.class);
-          if (successResponse.isSuccess()){
-            logger.info("HBS:Received heartbeat response from " + dataServer.getIp() + ":" + dataServer.getPort());
-          }
-        }catch (SocketTimeoutException e){
-          //remove from membership and try next data server
-          dataServerList.removeDataServer(dataServer);
-          logger.info("No response from " + dataServer.getIp() + ":" + dataServer.getPort() + " removing from membership");
-          if (!DataServerAPI.isPrimary()){
-            String primaryIp = DataServerAPI.primaryInfo.getIp();
-            int primaryPort = DataServerAPI.primaryInfo.getPort();
-            logger.info("primaryIp:" + primaryIp);
-            logger.info("primaryPort:" + primaryPort);
-            if (dataServer.getIp().equals(primaryIp) && dataServer.getPort() == primaryPort){
-              startElection();
-            }
-          }else {
-            dataServerList.removeDataServer(dataServer);
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Starts the election
-   */
-  private void startElection(){
-    DataServerAPI.setElecting();
-    logger.info("Failed to establish connection with primary data server");
-    logger.info("Starting election algorithm");
-
-    //update data in case did not receive update
-    for (DataServerInfo info: dataServerList.getDataServerInfo()){
-      long versionNum = history.versionNumber();
-      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
-      String response = httpHelper.performHttpGet(request);
-      UpdateDataResponse updateDataResponse = gson.fromJson(response, UpdateDataResponse.class);
-      if (updateDataResponse.isSuccess()){
-        if (!updateDataResponse.getVersion().equals(String.valueOf(versionNum))){
-          //data server cache is outdated, update database
-          logger.info("Data Server is Outdated. Version is " + versionNum);
-          long freshVersion = Long.valueOf(updateDataResponse.getVersion());
-          Map<String, List<ChannelPosting>> db = updateDataResponse.getData();
-          history.setDatabase(db);
-          history.setVersionNumber(Integer.valueOf(updateDataResponse.getVersion()));
-          logger.info("Data Server Cache. New Version is " + freshVersion);
-        }
-      }
-    }
-
-    //send Election message
-    boolean encounteredResponse = false;
-    List<DataServerInfo> higherNumberDS = dataServerList.getHigherNumberServers(DataServerAPI.port);
-    for (DataServerInfo info: higherNumberDS){
-      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionMethod;
+    List<DataServerInfo> dataServerInfo = dataServerList.getDataServerInfo();
+    for (int i=0; i < dataServerInfo.size();i++){
+      DataServerInfo dataServer = dataServerInfo.get(i);
       try {
-        //if received response, do nothing. Wait for coordinator message
-        String acceptResponse = httpHelper.performHttpGetWithTimeout(request, ELECTION_TIMEOUT);
-        encounteredResponse = true;
-      } catch (SocketTimeoutException e) {
-        //try next data server
-        dataServerList.removeDataServer(info);
-        logger.info("No response from " + info.getIp() + ":" + info.getPort() + " removing from membership");
+        String request = "http://" + dataServer.getIp() + ":" + dataServer.getPort() + requestMethod;
+        logger.info("Sending heartbeat to "+ dataServer.getIp() + ":" + dataServer.getPort());
+        String jsonResponse = httpHelper.performHttpGetWithTimeout(request, TIME_TO_EXPIRE);
+        SuccessResponse successResponse = gson.fromJson(jsonResponse, SuccessResponse.class);
+        if (successResponse.isSuccess()){
+          logger.info("HBS:Received heartbeat response from " + dataServer.getIp() + ":" + dataServer.getPort());
+        }
+      }catch (SocketTimeoutException e){
+        //remove from membership and try next data server
+        dataServerList.removeDataServer(dataServer);
+        logger.info("No response from " + dataServer.getIp() + ":" + dataServer.getPort() + " removing from membership");
+        dataServerList.removeDataServer(dataServer);
       }
-    }
-    if (!encounteredResponse){
-      //If there are no replies.. self elect
-      logger.info("No higher data servers replied, starting this isntance as new primary");
-      for (DataServerInfo info: dataServerList.getLowerNumberServers(DataServerAPI.port)){
-        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
-        httpHelper.performHttpGet(request);
-      }
-      logger.info("Notifying Web Servers");
-      //notify web servers
-      for (WebServerInfo info: webServerList.getWebServerInfo()){
-        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
-        httpHelper.performHttpGet(request);
-      }
-      DataServerAPI.setPrimary();
-      DataServerAPI.setNotElecting();
     }
   }
 }

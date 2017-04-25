@@ -4,9 +4,7 @@ import DataModel.DataServerList;
 import DataModel.MessageChannelList;
 import DataModel.WebServerInfo;
 import DataModel.WebServerList;
-import GsonModels.ResponseModels.ElectionAcceptResponse;
 import GsonModels.ResponseModels.NewSecondaryResponse;
-import GsonModels.ResponseModels.StarMessageResponse;
 import GsonModels.ResponseModels.ChannelsHistoryResponse;
 import GsonModels.ResponseModels.ChatPostMessageResponse;
 import GsonModels.ResponseModels.StarredChannelHistoryResponse;
@@ -38,15 +36,11 @@ public class DataServerAPIHelper implements Runnable {
   //API Methods
   private final String postMessageMethod = "chat.postMessage";
   private final String channelHistoryMethod = "channels.history";
-  private final String messageStarMethod = "message.star";
-  private final String channelStarMethod = "channels.star";
-  private final String configNewSecondaryMethod = "config.newSecondary";
+  private final String configNewSecondaryMethod = "config.newDataServer";
   private final String configNewWebServerMethod = "config.newWebServer";
   private final String notifyNewWebServerMethod = "config.notifyNewWebServer";
   private final String notifyNewSecondaryServerMethod = "config.notifyNewDataServer";
   private final String heartBeatMethod = "routine.heartBeat";
-  private final String electionMethod = "election.elect";
-  private final String electionCoordinatorMethod = "election.coordinator";
   private final String updateDataMethod = "update.data";
 
   //Socket connection for the request
@@ -132,10 +126,6 @@ public class DataServerAPIHelper implements Runnable {
           response = postMessageToChannel(params);
         }else if (method.equals(channelHistoryMethod)){
           response = returnChannelHistory(params);
-        }else if (method.equals(messageStarMethod)){
-          response = starMessage(params);
-        }else if (method.equals(channelStarMethod)){
-          response = getChannelStarredHistory(params);
         }else if (method.equals(notifyNewWebServerMethod)){
           response = getNotifyNewWebServerResponse(params);
         }else if (method.equals(notifyNewSecondaryServerMethod)){
@@ -144,9 +134,6 @@ public class DataServerAPIHelper implements Runnable {
           response = getConfigNewSecondaryResponse(params);
         }else if (method.equals(configNewWebServerMethod)){
           response = getConfigNewWebServerResponse(params);
-        }else if (method.equals(electionCoordinatorMethod)){
-          parseElectionCoordinatorMessage(params);
-          response = httpHelper.buildHTTPResponse(getSuccessResponse(true));
         }else if (method.equals(updateDataMethod)){
           response = getUpdateDataMethodResponse(params);
         }
@@ -154,9 +141,6 @@ public class DataServerAPIHelper implements Runnable {
         //methods with no parameters
         if (method.equals(heartBeatMethod)){
           response = httpHelper.buildHTTPResponse(getSuccessResponse(true));
-        }else if (method.equals(electionMethod)){
-          response = httpHelper.buildHTTPResponse(getElectionAcceptResponse());
-          sendElectionMessages();
         }
       }
     }
@@ -238,96 +222,6 @@ public class DataServerAPIHelper implements Runnable {
       }
     }
     return response;
-  }
-
-  /**
-   * Parses the message indicating a new primary data server has been elected
-   * @param params
-   */
-  public void parseElectionCoordinatorMessage(String params){
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("newPrimaryPort")) {
-        //remove old primary info
-        DataServerInfo oldPrimaryInfo = new DataServerInfo();
-        oldPrimaryInfo.setPort(DataServerAPI.primaryPort);
-        oldPrimaryInfo.setIp(DataServerAPI.primaryIp);
-        dataServers.removeDataServer(oldPrimaryInfo);
-
-        //set new primary info
-        int newPrimaryPort = Integer.valueOf(urlParamsMap.get("newPrimaryPort"));
-        String newPrimaryIp = socket.getInetAddress().toString().replaceAll("/", "");
-        DataServerAPI.primaryPort = newPrimaryPort;
-        DataServerAPI.primaryIp = newPrimaryIp;
-        DataServerInfo newPrimaryInfo = new DataServerInfo();
-        newPrimaryInfo.setIp(newPrimaryIp);
-        newPrimaryInfo.setPort(newPrimaryPort);
-        dataServers.addDataServer(newPrimaryInfo);
-        DataServerAPI.primaryInfo = newPrimaryInfo;
-        logger.info("New Data Server Elected as primary, removing old from membership");
-        DataServerAPI.setNotElecting();
-      }
-    }
-  }
-
-  /**
-   * Returns the JSON Response for the start election method
-   * @return The JSON Response
-   * */
-  public void sendElectionMessages(){
-    boolean encounteredResponse = false;
-    List<DataServerInfo> higherNumberDS = dataServers.getHigherNumberServers(DataServerAPI.port);
-    for (DataServerInfo info: higherNumberDS){
-      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionMethod;
-      try {
-        //if received response, do nothing. Wait for coordinator message
-        String acceptResponse = httpHelper.performHttpGetWithTimeout(request, ELECTION_TIMEOUT);
-        encounteredResponse = true;
-      } catch (SocketTimeoutException e) {
-        //remove from membership and try next data server
-        dataServers.removeDataServer(info);
-        logger.info("No response from " + info.getIp() + ":" + info.getPort() + " removing from membership");
-      }
-    }
-    if (!encounteredResponse){
-      //If there are no replies.. self elect
-      logger.info("No higher data servers replied, starting this instance as new primary");
-      logger.info("Notifying Data Servers");
-      for (DataServerInfo info: dataServers.getLowerNumberServers(DataServerAPI.port)){
-        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
-        httpHelper.performHttpGet(request);
-      }
-      logger.info("Notifying Web Servers");
-      //notify web servers
-      for (WebServerInfo info: webServers.getWebServerInfo()){
-        String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + electionCoordinatorMethod + "?newPrimaryPort=" + DataServerAPI.port;
-        httpHelper.performHttpGet(request);
-      }
-      DataServerAPI.setPrimary();
-      DataServerAPI.setNotElecting();
-    }
-    //update data in case did not receive update
-    for (DataServerInfo info: dataServers.getDataServerInfo()){
-      long versionNum = channelList.versionNumber();
-      String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
-      try {
-        String response = httpHelper.performHttpGetWithTimeout(request, ELECTION_TIMEOUT);
-        UpdateDataResponse updateDataResponse = gson.fromJson(response, UpdateDataResponse.class);
-        if (updateDataResponse.isSuccess()){
-          if (!updateDataResponse.getVersion().equals(String.valueOf(versionNum))){
-            //data server cache is outdated, update database
-            logger.info("Data Server is Outdated. Version is " + versionNum);
-            long freshVersion = Long.valueOf(updateDataResponse.getVersion());
-            Map<String, List<ChannelPosting>> db = updateDataResponse.getData();
-            channelList.setDatabase(db);
-            channelList.setVersionNumber(Integer.valueOf(updateDataResponse.getVersion()));
-            logger.info("Data Server Cache. New Version is " + freshVersion);
-          }
-        }
-      }catch (SocketTimeoutException e){
-
-      }
-    }
   }
 
   /**
@@ -460,98 +354,6 @@ public class DataServerAPIHelper implements Runnable {
   }
 
   /**
-   * Returns the JSON Response for retrieving the channel's starred history
-   * @param params The parameters from the REST call
-   * @return The JSON Response
-   * */
-  public String getChannelStarredHistory(String params){
-    String response = httpHelper.HTTP404;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("channel") && urlParamsMap.containsKey("version")){
-        String channel = urlParamsMap.get("channel");
-        String version = urlParamsMap.get("version");
-        if (channel != null && version != null){
-          StarredChannelHistoryResponse starredChannelHistoryResponse = new StarredChannelHistoryResponse();
-          boolean success = false;
-          try {
-            //add freshest version to response
-            long webServerVersion = Long.valueOf(version);
-            long freshestVersion = channelList.freshVersion(webServerVersion);
-            starredChannelHistoryResponse.setVersion(String.valueOf(freshestVersion));
-
-            //Add History in response if version not up-to-date
-            if (freshestVersion != webServerVersion){
-              Object[] channelHistory = channelList.getChannelStarredHistory(channel);
-              success = channelHistory != null;
-              starredChannelHistoryResponse.setMessages(channelHistory);
-            }else {
-              success = true;
-            }
-          }catch (NumberFormatException e){
-            success = false;
-          }
-          starredChannelHistoryResponse.setSuccess(success);
-          String json = gson.toJson(starredChannelHistoryResponse);
-          response = httpHelper.buildHTTPResponse(json);
-        }else {
-          response = httpHelper.HTTP400;
-        }
-      }else {
-        response = httpHelper.HTTP404;
-      }
-    }
-    return response;
-  }
-
-  /**
-   * Stars a message
-   * @param params The parameters from the REST call
-   * @return The JSON Response
-   * */
-  public String starMessage(String params){
-    String response = httpHelper.HTTP404;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("messageid")){
-        String messageid = urlParamsMap.get("messageid");
-        if (messageid != null){
-          boolean success = true;
-          if (DataServerAPI.isPrimary()){
-            //forward star to secondaries
-            List<DataServerInfo> dataServerInfoList = dataServers.getDataServerInfo();
-            for (int i=0; i < dataServerInfoList.size(); i++){
-              DataServerInfo secondary = dataServerInfoList.get(i);
-              int secondaryPort = secondary.getPort();
-              String secondaryIp = secondary.getIp();
-              String secondaryRequest = "http://" + secondaryIp + ":" + secondaryPort + "/api/" + messageStarMethod + "?messageid=" + messageid;
-              String secondaryResponse = httpHelper.performHttpGet(secondaryRequest);
-              StarMessageResponse messageResponse = gson.fromJson(secondaryResponse, StarMessageResponse.class);
-              if (!messageResponse.isSuccess()){
-                success = false;
-                logger.info("Data server " + i + " unsuccessfully starred message");
-              }else {
-                logger.info("Data server " + i + " successfully starred message");
-              }
-            }
-          }
-
-          success = channelList.starMessage(messageid) && success;
-          StarMessageResponse starMessageResponse = new StarMessageResponse();
-          starMessageResponse.setSuccess(success);
-          String json = gson.toJson(starMessageResponse);
-          response = httpHelper.buildHTTPResponse(json);
-        }else {
-          response = httpHelper.HTTP400;
-        }
-      }else {
-        response = httpHelper.HTTP404;
-      }
-    }
-    return response;
-  }
-
-  /**
    * Returns the JSON Response for retrieving the channel history
    * @param params The parameters from the REST call
    * @return The JSON Response
@@ -665,33 +467,21 @@ public class DataServerAPIHelper implements Runnable {
         String text = urlParamsMap.get("text");
         if (channel != null && text != null){
           boolean success = true;
-          if (DataServerAPI.isPrimary()){
-            //notify secondaries of message
-            logger.info("Forwarding request to secondaries");
-            List<DataServerInfo> dataServerInfos = dataServers.getDataServerInfo();
-            for (int i=0; i < dataServerInfos.size(); i++){
-              if (DataServerAPI.testing && i==0){
-                //skip first DS
-                logger.info("Testing: skipping first secondary post");
-                continue;
-              }
-              DataServerInfo dataServer = dataServerInfos.get(i);
-              String dsIp = dataServer.getIp();
-              int dsPort = dataServer.getPort();
-              String dsRequest = "http://" + dsIp + ":" + dsPort + "/api/" + postMessageMethod + "?channel=" + channel + "&text=" + text;
-              String dsResponse = httpHelper.performHttpGet(dsRequest);
-              ChatPostMessageResponse chatPostMessageResponse = gson.fromJson(dsResponse, ChatPostMessageResponse.class);
-              if (!chatPostMessageResponse.isSuccess()){
-                success = false;
-                logger.info("Secondary " + i + " unsuccessfully posted message");
-              }else {
-                logger.info("Secondary " + i + " successfully posted message");
-              }
-            }
-            if (DataServerAPI.testing){
-              logger.info("Forwarded post to all but first data server.");
-              logger.info("Killing primary (self)");
-              System.exit(1);
+          //notify secondaries of message
+          logger.info("Forwarding request to secondaries");
+          List<DataServerInfo> dataServerInfos = dataServers.getDataServerInfo();
+          for (int i=0; i < dataServerInfos.size(); i++){
+            DataServerInfo dataServer = dataServerInfos.get(i);
+            String dsIp = dataServer.getIp();
+            int dsPort = dataServer.getPort();
+            String dsRequest = "http://" + dsIp + ":" + dsPort + "/api/" + postMessageMethod + "?channel=" + channel + "&text=" + text;
+            String dsResponse = httpHelper.performHttpGet(dsRequest);
+            ChatPostMessageResponse chatPostMessageResponse = gson.fromJson(dsResponse, ChatPostMessageResponse.class);
+            if (!chatPostMessageResponse.isSuccess()){
+              success = false;
+              logger.info("Secondary " + i + " unsuccessfully posted message");
+            }else {
+              logger.info("Secondary " + i + " successfully posted message");
             }
           }
           long messageID = channelList.postMessage(channel, text);
@@ -726,16 +516,6 @@ public class DataServerAPIHelper implements Runnable {
     successResponse.setSuccess(success);
     return gson.toJson(successResponse);
   }
-
-  /**
-   * @return A JSON election "Accept" response
-   * */
-  public String getElectionAcceptResponse(){
-    ElectionAcceptResponse acceptResponse = new ElectionAcceptResponse();
-    acceptResponse.setAccept(true);
-    return gson.toJson(acceptResponse);
-  }
-
   /**
    * Builds an http request for notifying secondary Data Servers of a new Web Server
    * @param dsIp the Ip of the data server to be notified

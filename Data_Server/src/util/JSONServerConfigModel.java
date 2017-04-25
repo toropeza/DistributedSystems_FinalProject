@@ -8,48 +8,22 @@ import java.util.List;
  * Information describing the config file
  */
 public class JSONServerConfigModel {
-  String server_type;
-  String primaryIp;
-  String primaryPort;
-  int serverNumber;
-  int primaryServerNumber;
   int port;
-  boolean test;
-  List<WebServerInfo> webservers;
-
-  public int getPrimaryServerNumber() {
-    return primaryServerNumber;
-  }
-
-  public void setPrimaryServerNumber(int primaryServerNumber) {
-    this.primaryServerNumber = primaryServerNumber;
-  }
-
-  public boolean isTest() {
-    return test;
-  }
-
-  public int getServerNumber() {
-    return serverNumber;
-  }
-
-  public String getServer_type() {
-    return server_type;
-  }
-
-  public List<WebServerInfo> getWebservers() {
-    return webservers;
-  }
+  WebServerInfo webserver;
 
   public int getPort() {
     return port;
   }
 
-  public String getPrimaryIp() {
-    return primaryIp;
+  public void setPort(int port) {
+    this.port = port;
   }
 
-  public String getPrimaryPort() {
-    return primaryPort;
+  public WebServerInfo getWebserver() {
+    return webserver;
+  }
+
+  public void setWebserver(WebServerInfo webserver) {
+    this.webserver = webserver;
   }
 }
