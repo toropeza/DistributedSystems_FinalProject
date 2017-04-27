@@ -1,16 +1,12 @@
-import DataModel.ChannelPosting;
-import DataModel.DataServerInfo;
+import DataModel.ServerInfo;
 import DataModel.DataServerList;
 import DataModel.MessageChannelList;
-import DataModel.WebServerInfo;
 import DataModel.WebServerList;
 import GsonModels.ResponseModels.SuccessResponse;
-import GsonModels.ResponseModels.UpdateDataResponse;
 import com.google.gson.Gson;
 
 import java.net.SocketTimeoutException;
 import java.util.List;
-import java.util.Map;
 import java.util.TimerTask;
 import java.util.logging.Logger;
 
@@ -28,12 +24,11 @@ public class HeartBeatSender extends TimerTask{
   private Gson gson;
   private DataServerList dataServerList;
   private MessageChannelList history;
-  private WebServerList webServerList;
   private String requestMethod = "/api/routine.heartBeat";
 
-  public HeartBeatSender(DataServerList dataServerList, WebServerList webServerList, MessageChannelList history){
+  public HeartBeatSender(DataServerList dataServerList, MessageChannelList history){
     this.dataServerList = dataServerList;
-    this.webServerList = webServerList;
+
     this.history = history;
     httpHelper = new HTTPHelper();
     gson = new Gson();
@@ -49,9 +44,9 @@ public class HeartBeatSender extends TimerTask{
    * Will start election algorithm on heartbeat failure
    */
   private void sendHeartBeats() {
-    List<DataServerInfo> dataServerInfo = dataServerList.getDataServerInfo();
+    List<ServerInfo> dataServerInfo = dataServerList.getDataServerInfo();
     for (int i=0; i < dataServerInfo.size();i++){
-      DataServerInfo dataServer = dataServerInfo.get(i);
+      ServerInfo dataServer = dataServerInfo.get(i);
       try {
         String request = "http://" + dataServer.getIp() + ":" + dataServer.getPort() + requestMethod;
         logger.info("Sending heartbeat to "+ dataServer.getIp() + ":" + dataServer.getPort());

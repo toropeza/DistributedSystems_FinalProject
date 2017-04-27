@@ -1,9 +1,11 @@
 import DataModel.ChannelPosting;
 import DataModel.MessageCache;
+import DataModel.ServerInfo;
 import ResponseModels.ChannelsHistoryResponse;
 import ResponseModels.DSChannelsStarResponse;
 import ResponseModels.SuccessResponse;
 import com.google.gson.Gson;
+import util.RequestBuilder;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -29,14 +31,6 @@ public class WebServerAPIHelper implements Runnable {
   private final String CONTENT_TYPE = "Content-Type: application/json \n";
   private String CONTENT_LENGTH = "Content-Length:";
 
-  //API
-  private final String postMessageMethod = "chat.postMessage";
-  private final String channelHistoryMethod = "channels.history";
-  private final String messageStarMethod = "message.star";
-  private final String channelStarMethod = "channels.star";
-  private final String electionCoordinatorMethod = "election.coordinator";
-  private final String dataServerBaseURL;
-
   //Socket connection for the request
   private Socket socket;
 
@@ -53,6 +47,9 @@ public class WebServerAPIHelper implements Runnable {
   //Cache for starred messages
   MessageCache starredMessageCache;
 
+  //Builds Requests for the API
+  RequestBuilder requestBuilder;
+
   /**
    * Creates a new Runnable Helper
    * @param socket The socket connection wishing to make an API Request
@@ -67,7 +64,7 @@ public class WebServerAPIHelper implements Runnable {
     this.starredMessageCache = starredMessageCache;
     gson = new Gson();
     httpHelper = new HTTPHelper();
-    dataServerBaseURL = "http://" + dataServerIP + ":" + dataServerPort + "/api/";
+    requestBuilder = new RequestBuilder(new ServerInfo(dataServerIP, Integer.valueOf(dataServerPort)));
   }
 
   @Override
@@ -117,40 +114,18 @@ public class WebServerAPIHelper implements Runnable {
       if (methodAndParams.length == 2){
         String method = methodAndParams[0];
         String params = methodAndParams[1];
-        if (method.equals(postMessageMethod)){
+        if (method.equals(RequestBuilder.postMessageMethod)){
           response = postMessageToChannel(params);
-        }else if (method.equals(channelHistoryMethod)){
+        }else if (method.equals(RequestBuilder.channelHistoryMethod)){
           response = returnChannelHistory(params);
-        }else if (method.equals(messageStarMethod)){
+        }else if (method.equals(RequestBuilder.messageStarMethod)){
           response = starChannelMessage(params);
-        }else if (method.equals(channelStarMethod)){
+        }else if (method.equals(RequestBuilder.channelStarMethod)){
           response = getChannelStarredHistory(params);
-        }else if (method.equals(electionCoordinatorMethod)){
-          parseElectionCoordinatorMethod(params);
-          SuccessResponse successResponse = new SuccessResponse();
-          successResponse.setSuccess(true);
-          response = gson.toJson(successResponse);
         }
       }
     }
     return response;
-  }
-
-  /**
-   * Parses an election message for a new primary data server
-   * @param params The parameters from the REST call
-   * @return The JSON Response
-   * */
-  public void parseElectionCoordinatorMethod(String params){
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("newPrimaryPort")){
-        int newPrimaryPort = Integer.valueOf(urlParamsMap.get("newPrimaryPort"));
-        String newPrimaryIp = socket.getInetAddress().toString().replaceAll("/","");
-        WebServerAPI.setPrimaryData(newPrimaryIp, newPrimaryPort);
-        logger.info("New Primary : " + newPrimaryIp + ":" + newPrimaryPort + " added to membership");
-      }
-    }
   }
 
   /**
@@ -166,7 +141,7 @@ public class WebServerAPIHelper implements Runnable {
         String channel = urlParamsMap.get("channel");
         if (channel != null){
           String versionNumber = String.valueOf(starredMessageCache.getVersionNumber());
-          String channelStarredHistoryRequest = buildDSChannelsStarRequest(channel, versionNumber);
+          String channelStarredHistoryRequest = requestBuilder.buildDSChannelsStarRequest(channel, versionNumber);
           try {
             String json = httpHelper.performHttpGet(channelStarredHistoryRequest);
             DSChannelsStarResponse dsChannelsStarResponse = gson.fromJson(json, DSChannelsStarResponse.class);
@@ -221,7 +196,7 @@ public class WebServerAPIHelper implements Runnable {
       if (urlParamsMap != null && urlParamsMap.containsKey("messageid")){
         String messageid = urlParamsMap.get("messageid");
         if (messageid != null){
-          String starMessageRequest = buildDSStarMessageRequest(messageid);
+          String starMessageRequest = requestBuilder.buildDSStarMessageRequest(messageid);
           try {
             String json = httpHelper.performHttpGet(starMessageRequest);
             response = buildHTTPResponse(json);
@@ -253,7 +228,7 @@ public class WebServerAPIHelper implements Runnable {
         String channel = urlParamsMap.get("channel");
         if (channel != null){
           try {
-            String channelHistoryRequest = buildDSChannelHistoryRequest(channel);
+            String channelHistoryRequest = requestBuilder.buildDSChannelHistoryRequest(channel);
             String json = httpHelper.performHttpGet(channelHistoryRequest);
             response = buildHTTPResponse(json);
           }catch (Exception e){
@@ -285,7 +260,7 @@ public class WebServerAPIHelper implements Runnable {
         String text = urlParamsMap.get("text");
         if (channel != null && text != null){
           try {
-            String postMessageRequest = buildDSPostMessageRequest(channel, text);
+            String postMessageRequest = requestBuilder.buildDSPostMessageRequest(channel, text);
             String json = httpHelper.performHttpGet(postMessageRequest);
             response = buildHTTPResponse(json);
           }catch (Exception e){
@@ -301,44 +276,6 @@ public class WebServerAPIHelper implements Runnable {
       }
     }
     return response;
-  }
-
-  /**
-   * Build a GET request for the Data Server to retrieve the given channel's history
-   * @param channel The channel to retrieve the history for
-   * */
-  public String buildDSChannelHistoryRequest(String channel){
-    String args = "?channel=" + channel;
-    return dataServerBaseURL + channelHistoryMethod + args;
-  }
-
-  /**
-   * Build a GET request for posting a message to the given channel
-   * @param channel The channel to post to
-   * @param text The text to post
-   * */
-  public String buildDSPostMessageRequest(String channel, String text){
-    String args = "?channel=" + channel + "&text=" + text;
-    return dataServerBaseURL + postMessageMethod + args;
-  }
-
-  /**
-   * Build a GET request for starring the given message
-   * @param messageId The ID of the message to star
-   * */
-  public String buildDSStarMessageRequest(String messageId){
-    String args = "?messageid=" + messageId;
-    return dataServerBaseURL + messageStarMethod + args;
-  }
-
-  /**
-   * Build a GET request for the Data Server to retrieve the given channel's Starred history
-   * @param channel The channel to retreive the history for
-   * @param version The version of the Message Cache
-   * */
-  public String buildDSChannelsStarRequest(String channel, String version){
-    String args = "?channel=" + channel + "&version=" + version;
-    return dataServerBaseURL + channelStarMethod + args;
   }
 
   /**

@@ -27,6 +27,14 @@ public class DataServerList {
     readWriteLock.unlockWrite();
   }
 
+  public int size(){
+    int size = 0;
+    readWriteLock.lockRead();
+    size = dataServerInfo.size();
+    readWriteLock.unlockRead();
+    return size;
+  }
+
   /**
    * Adds the Data Server Information
    * @param info
@@ -54,6 +62,19 @@ public class DataServerList {
     }
     readWriteLock.unlockRead();
     return copy;
+  }
+
+  /**
+   * Returns the Data Server at the given index
+   */
+  public ServerInfo getDataServer(int index){
+    ServerInfo dataServer = new ServerInfo();
+    readWriteLock.lockRead();
+    ServerInfo info = dataServerInfo.get(index);
+    dataServer.setIp(info.getIp());
+    dataServer.setPort(info.getPort());
+    readWriteLock.unlockRead();
+    return dataServer;
   }
 
   /**

@@ -1,7 +1,11 @@
+import DataModel.DataServerList;
 import DataModel.MessageCache;
+import DataModel.ServerInfo;
 import util.WorkQueue;
 
 import java.net.Socket;
+import java.util.List;
+import java.util.Random;
 
 /**
  * API provided by Message Server
@@ -11,34 +15,27 @@ public class WebServerAPI {
   //cache of starred Messages in a channel
   private MessageCache starredMessageCache;
 
-  //Data Server configuration
-  private static String dataServerPort;
-  private static String dataServerIP;
+  //list of data servers
+  public static DataServerList dataServerList;
 
   //Queue of runnables executed by Threads
   private WorkQueue workQueue;
 
-  public WebServerAPI(String dataServerPort, String dataServerIP){
-    this.dataServerPort = dataServerPort;
-    this.dataServerIP = dataServerIP;
+  public WebServerAPI(List<ServerInfo> dataServers){
     workQueue = new WorkQueue();
     starredMessageCache = new MessageCache();
+    dataServerList = new DataServerList();
+    dataServerList.setDataServers(dataServers);
   }
 
   /**
    * Asynchronously parses the incoming connection
    * */
   public void parseAPIRequest(Socket socketConnection){
+    int randPick = new Random().nextInt(dataServerList.size());
+    ServerInfo pickedDataServer = dataServerList.getDataServer(randPick);
+    String dataServerPort = String.valueOf(pickedDataServer.getPort());
+    String dataServerIP = pickedDataServer.getIp();
     workQueue.execute(new WebServerAPIHelper(socketConnection, dataServerPort, dataServerIP, starredMessageCache));
-  }
-
-  /**
-   * Sets the Primary Data Server Info
-   * @param ip The Primary's IP
-   * @param port The Primary's Port
-   */
-  public static synchronized void setPrimaryData(String ip, int port){
-    dataServerIP = ip;
-    dataServerPort = String.valueOf(port);
   }
 }

@@ -1,13 +1,11 @@
 import DataModel.ChannelPosting;
-import DataModel.DataServerInfo;
+import DataModel.ServerInfo;
 import DataModel.DataServerList;
 import DataModel.MessageChannelList;
-import DataModel.WebServerInfo;
 import DataModel.WebServerList;
 import GsonModels.ResponseModels.NewSecondaryResponse;
 import GsonModels.ResponseModels.ChannelsHistoryResponse;
 import GsonModels.ResponseModels.ChatPostMessageResponse;
-import GsonModels.ResponseModels.StarredChannelHistoryResponse;
 import GsonModels.ResponseModels.SuccessResponse;
 import GsonModels.ResponseModels.UpdateDataResponse;
 import com.google.gson.Gson;
@@ -36,10 +34,6 @@ public class DataServerAPIHelper implements Runnable {
   //API Methods
   private final String postMessageMethod = "chat.postMessage";
   private final String channelHistoryMethod = "channels.history";
-  private final String configNewSecondaryMethod = "config.newDataServer";
-  private final String configNewWebServerMethod = "config.newWebServer";
-  private final String notifyNewWebServerMethod = "config.notifyNewWebServer";
-  private final String notifyNewSecondaryServerMethod = "config.notifyNewDataServer";
   private final String heartBeatMethod = "routine.heartBeat";
   private final String updateDataMethod = "update.data";
 
@@ -52,9 +46,6 @@ public class DataServerAPIHelper implements Runnable {
   //HTTP Helper for parsing HTTP Requests
   HTTPHelper httpHelper;
 
-  //List of all WebServers
-  WebServerList webServers;
-
   //List of all DataServers
   DataServerList dataServers;
 
@@ -66,10 +57,9 @@ public class DataServerAPIHelper implements Runnable {
    * @param socket The socket connection wishing to make an API Request
    * @param channelList The main DataModel.MessageChannelList reference
    * */
-  public DataServerAPIHelper(Socket socket, MessageChannelList channelList, WebServerList webServers, DataServerList dataServers){
+  public DataServerAPIHelper(Socket socket, MessageChannelList channelList, DataServerList dataServers){
     this.socket = socket;
     this.channelList = channelList;
-    this.webServers = webServers;
     this.dataServers = dataServers;
     gson = new Gson();
     httpHelper = new HTTPHelper();
@@ -126,14 +116,6 @@ public class DataServerAPIHelper implements Runnable {
           response = postMessageToChannel(params);
         }else if (method.equals(channelHistoryMethod)){
           response = returnChannelHistory(params);
-        }else if (method.equals(notifyNewWebServerMethod)){
-          response = getNotifyNewWebServerResponse(params);
-        }else if (method.equals(notifyNewSecondaryServerMethod)){
-          response = getNotifyNewSecondaryServerResponse(params);
-        }else if (method.equals(configNewSecondaryMethod)){
-          response = getConfigNewSecondaryResponse(params);
-        }else if (method.equals(configNewWebServerMethod)){
-          response = getConfigNewWebServerResponse(params);
         }else if (method.equals(updateDataMethod)){
           response = getUpdateDataMethodResponse(params);
         }
@@ -176,7 +158,7 @@ public class DataServerAPIHelper implements Runnable {
             } else if (dataServerVersion > currentVersion){
               //update data in case did not receive update
               Map<String, List<ChannelPosting>> channelPostings = channelList.getDatabase();
-              for (DataServerInfo info:dataServers.getDataServerInfo()){
+              for (ServerInfo info:dataServers.getDataServerInfo()){
                 long versionNum = channelList.versionNumber();
                 String request = "http://" + info.getIp() + ":" + info.getPort() + "/api/" + updateDataMethod + "?version=" + versionNum;
                 try {
@@ -225,135 +207,6 @@ public class DataServerAPIHelper implements Runnable {
   }
 
   /**
-   * Returns the JSON Response for the new web server method
-   * @return The JSON Response
-   * */
-  public String getNotifyNewSecondaryServerResponse(String params){
-    String response = httpHelper.HTTP404;
-    boolean success = false;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("port") && urlParamsMap.containsKey("ip")){
-        int port = Integer.valueOf(urlParamsMap.get("port"));
-        String ip = urlParamsMap.get("ip");
-        DataServerInfo info = new DataServerInfo();
-        info.setPort(port);
-        info.setIp(ip);
-        dataServers.addDataServer(info);
-        logger.info("New data server added to membership");
-        success = true;
-      }
-    }
-
-    String json = getSuccessResponse(success);
-    response = httpHelper.buildHTTPResponse(json);
-    return response;
-  }
-
-  /**
-   * Returns the JSON Response for the new secondary method
-   * @return The JSON Response
-   * */
-  public String getConfigNewSecondaryResponse(String params){
-    String response = httpHelper.HTTP404;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("port")){
-        int port = Integer.valueOf(urlParamsMap.get("port"));
-        String json = buildConfigNewSecondaryResponse(port);
-        response = httpHelper.buildHTTPResponse(json);
-      }
-    }
-    return response;
-  }
-
-  /**
-   * Returns the JSON Response for the configure web server method
-   * @return The JSON Response
-   * */
-  public String getConfigNewWebServerResponse(String params){
-    boolean success = false;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("port")){
-        int wsPort = Integer.valueOf(urlParamsMap.get("port"));
-        String wsIp = socket.getInetAddress().toString().replaceAll("/","");
-
-        //add to web server list
-        WebServerInfo info = new WebServerInfo();
-        info.setPort(wsPort);
-        info.setIp(wsIp);
-        webServers.addWebServer(info);
-        success = true;
-        logger.info("New Web Server " + wsIp + ":" + wsPort + " added to Group Membership");
-
-        List<DataServerInfo> dataServerList = dataServers.getDataServerInfo();
-        if (dataServerList.size() > 0){
-          //notify each secondary data server of the new web server
-          boolean[] successfulResponses = new boolean[dataServerList.size()];
-          for (int i=0; i < dataServerList.size(); i++){
-            DataServerInfo dataServer = dataServerList.get(i);
-            int port = dataServer.getPort();
-            String ip = dataServer.getIp();
-
-            String request = buildNotifyNewWebServerRequest(ip, port, wsIp, wsPort);
-            String response = httpHelper.performHttpGet(request);
-            SuccessResponse successResponse = gson.fromJson(response, SuccessResponse.class);
-            if (successResponse != null){
-              if (successResponse.isSuccess()){
-                successfulResponses[i] = true;
-                logger.info("Secondary Data Server " + i + " notified of new Web Server");
-              }
-            }
-          }
-          success = false;
-          for (int i=0; i < successfulResponses.length; i++){
-            if (successfulResponses[i]){
-              success = true;
-            }else {
-              success = false;
-              break;
-            }
-          }
-        }
-      }
-    }
-    if (success){
-      logger.info("All Secondary Data Servers notified of new Web Server");
-    }else {
-      logger.warning("There was an error notifying secondary Data Servers of new Web Server");
-    }
-    String json = getSuccessResponse(success);
-    String response = httpHelper.buildHTTPResponse(json);
-    return response;
-  }
-
-  /**
-   * Returns the JSON Response for the new web server method
-   * @return The JSON Response
-   * */
-  public String getNotifyNewWebServerResponse(String params){
-    String response = httpHelper.HTTP404;
-    boolean success = false;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("port") && urlParamsMap.containsKey("ip")){
-        int port = Integer.valueOf(urlParamsMap.get("port"));
-        String ip = urlParamsMap.get("ip");
-        WebServerInfo info = new WebServerInfo();
-        info.setPort(port);
-        info.setIp(ip);
-        webServers.addWebServer(info);
-        success = true;
-        logger.info("Web Server " + ip + ":" + port +" added to group membership");
-      }
-    }
-    String json = getSuccessResponse(success);
-    response = httpHelper.buildHTTPResponse(json);
-    return response;
-  }
-
-  /**
    * Returns the JSON Response for retrieving the channel history
    * @param params The parameters from the REST call
    * @return The JSON Response
@@ -393,67 +246,6 @@ public class DataServerAPIHelper implements Runnable {
   }
 
   /**
-   * Returns the JSON response for the entire database
-   * @return the JSON response for the entire database
-   * */
-  public String buildConfigNewSecondaryResponse(int newSecondaryPort){
-    boolean success = false;
-    String newSecondaryIp = socket.getInetAddress().toString().replaceAll("/", "");
-
-    //notify other secondaries
-    List<DataServerInfo> dataServerInfoList = dataServers.getDataServerInfo();
-    if (dataServerInfoList.size() > 0){
-      boolean[] successfulResponses = new boolean[dataServerInfoList.size()];
-      for (int i=0; i < dataServerInfoList.size(); i++){
-        DataServerInfo dataServerInfo = dataServerInfoList.get(i);
-        int secondaryPort = dataServerInfo.getPort();
-        String secondaryIp = dataServerInfo.getIp();
-
-        String request = buildNotifyNewSecondaryServerRequest(secondaryIp, secondaryPort, newSecondaryIp, newSecondaryPort);
-        String secondaryResponse = httpHelper.performHttpGet(request);
-        SuccessResponse successResponse = gson.fromJson(secondaryResponse, SuccessResponse.class);
-        if (successResponse != null){
-          if (successResponse.isSuccess()){
-            successfulResponses[i] = true;
-            logger.info("Secondary " + i + " successfully added new data server to its membership list");
-          }
-        }
-      }
-      success = false;
-      for (int i=0; i < successfulResponses.length; i++){
-        if (successfulResponses[i]){
-          success = true;
-        }else {
-          success = false;
-          break;
-        }
-      }
-    }
-
-    NewSecondaryResponse response = new NewSecondaryResponse();
-    Map<String, List<ChannelPosting>> db =  channelList.getDatabase();
-    List<WebServerInfo> webServerInfo = webServers.getWebServerInfo();
-    List<DataServerInfo> dataServerInfo = dataServers.getDataServerInfo();
-    if (db != null && webServerInfo != null){
-      response.setSuccess(success);
-      response.setDatabase(db);
-      response.setWebServers(webServerInfo);
-      response.setDataServers(dataServerInfo);
-      response.setVersionNumber(channelList.versionNumber());
-    }else {
-      response.setSuccess(false);
-    }
-
-    DataServerInfo info = new DataServerInfo();
-    info.setIp(newSecondaryIp);
-    info.setPort(newSecondaryPort);
-    dataServers.addDataServer(info);
-    logger.info("New secondary data server running at " + newSecondaryIp + ":" + newSecondaryPort + " added to group membership");
-
-    return gson.toJson(response);
-  }
-
-  /**
    * Posts a message to the passed in channel
    * @param params The parameters from the REST call
    * @return The JSON Response
@@ -469,9 +261,9 @@ public class DataServerAPIHelper implements Runnable {
           boolean success = true;
           //notify secondaries of message
           logger.info("Forwarding request to secondaries");
-          List<DataServerInfo> dataServerInfos = dataServers.getDataServerInfo();
+          List<ServerInfo> dataServerInfos = dataServers.getDataServerInfo();
           for (int i=0; i < dataServerInfos.size(); i++){
-            DataServerInfo dataServer = dataServerInfos.get(i);
+            ServerInfo dataServer = dataServerInfos.get(i);
             String dsIp = dataServer.getIp();
             int dsPort = dataServer.getPort();
             String dsRequest = "http://" + dsIp + ":" + dsPort + "/api/" + postMessageMethod + "?channel=" + channel + "&text=" + text;
@@ -515,30 +307,5 @@ public class DataServerAPIHelper implements Runnable {
     SuccessResponse successResponse = new SuccessResponse();
     successResponse.setSuccess(success);
     return gson.toJson(successResponse);
-  }
-  /**
-   * Builds an http request for notifying secondary Data Servers of a new Web Server
-   * @param dsIp the Ip of the data server to be notified
-   * @param dsPort the Port of the data server to be notified
-   * @param wsIp the Ip of the new Web Server
-   * @param wsPort the Port of the new Web Server
-   * @return the http Request ready to execute
-   */
-  public String buildNotifyNewWebServerRequest(String dsIp, int dsPort, String wsIp, int wsPort){
-    String args = "?ip=" + wsIp + "&port=" + wsPort;
-    return  "http://" + dsIp + ":" + dsPort + "/api/" + notifyNewWebServerMethod + args;
-  }
-
-  /**
-   * Builds an http request for notifying secondary Data Servers of another Secondary Server
-   * @param dsIp the Ip of the data server to be notified
-   * @param dsPort the Port of the data server to be notified
-   * @param newDSIp the Ip of the new Secondary Server
-   * @param newDSPort the Port of the new Secondary Server
-   * @return the http Request ready to execute
-   */
-  public String buildNotifyNewSecondaryServerRequest(String dsIp, int dsPort, String newDSIp, int newDSPort){
-    String args = "?ip=" + newDSIp + "&port=" + newDSPort;
-    return  "http://" + dsIp + ":" + dsPort + "/api/" + notifyNewSecondaryServerMethod + args;
   }
 }

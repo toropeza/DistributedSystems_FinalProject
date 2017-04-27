@@ -11,7 +11,7 @@ import java.util.List;
 public class WebServerList {
 
   ReadWriteLock readWriteLock = new ReadWriteLock();
-  List<WebServerInfo> webServerInfo;
+  List<ServerInfo> webServerInfo;
 
   public WebServerList(){
     webServerInfo = new ArrayList<>();
@@ -21,7 +21,7 @@ public class WebServerList {
    * Sets the given web servers
    * @param webServerIps
    */
-  public void setWebServers(List<WebServerInfo> webServerIps){
+  public void setWebServers(List<ServerInfo> webServerIps){
     readWriteLock.lockWrite();
     this.webServerInfo = webServerIps;
     readWriteLock.unlockWrite();
@@ -31,7 +31,7 @@ public class WebServerList {
    * Adds the given web servers to the lsit
    * @param info
    */
-  public void addWebServer(WebServerInfo info){
+  public void addWebServer(ServerInfo info){
     readWriteLock.lockWrite();
     if (!containsWebServer(info)){
       webServerInfo.add(info);
@@ -42,11 +42,11 @@ public class WebServerList {
   /**
    * @return A Thread-Safe copy of the Web Server Info List
    */
-  public List<WebServerInfo> getWebServerInfo(){
-    List<WebServerInfo> copy = new ArrayList<>();
+  public List<ServerInfo> getWebServerInfo(){
+    List<ServerInfo> copy = new ArrayList<>();
     readWriteLock.lockRead();
-    for (WebServerInfo info: webServerInfo){
-      WebServerInfo infoCopy = new WebServerInfo();
+    for (ServerInfo info: webServerInfo){
+      ServerInfo infoCopy = new ServerInfo();
       infoCopy.setIp(info.getIp());
       infoCopy.setPort(info.getPort());
       copy.add(infoCopy);
@@ -58,11 +58,11 @@ public class WebServerList {
   /**
    * @return Whether the Web Server Info List contains the given info
    */
-  public boolean containsWebServer(WebServerInfo webServer){
+  public boolean containsWebServer(ServerInfo webServer){
     String ip = webServer.getIp();
     int port = webServer.getPort();
     boolean containsIp = false;
-    for (WebServerInfo info: webServerInfo){
+    for (ServerInfo info: webServerInfo){
       if (info.getIp().equals(ip) && info.getPort() == port){
         containsIp = true;
       }

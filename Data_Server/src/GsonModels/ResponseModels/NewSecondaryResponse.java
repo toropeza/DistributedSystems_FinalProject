@@ -1,8 +1,7 @@
 package GsonModels.ResponseModels;
 
 import DataModel.ChannelPosting;
-import DataModel.DataServerInfo;
-import DataModel.WebServerInfo;
+import DataModel.ServerInfo;
 
 import java.util.List;
 import java.util.Map;
@@ -13,8 +12,8 @@ import java.util.Map;
 public class NewSecondaryResponse {
   private boolean success;
   private Map<String, List<ChannelPosting>> database;
-  private List<WebServerInfo> webServers;
-  private List<DataServerInfo> dataServers;
+  private List<ServerInfo> webServers;
+  private List<ServerInfo> dataServers;
   private long versionNumber;
 
   public long getVersionNumber() {
@@ -41,19 +40,19 @@ public class NewSecondaryResponse {
     this.database = database;
   }
 
-  public List<WebServerInfo> getWebServers() {
+  public List<ServerInfo> getWebServers() {
     return webServers;
   }
 
-  public void setWebServers(List<WebServerInfo> webServers) {
+  public void setWebServers(List<ServerInfo> webServers) {
     this.webServers = webServers;
   }
 
-  public List<DataServerInfo> getDataServers() {
+  public List<ServerInfo> getDataServers() {
     return dataServers;
   }
 
-  public void setDataServers(List<DataServerInfo> dataServers) {
+  public void setDataServers(List<ServerInfo> dataServers) {
     this.dataServers = dataServers;
   }
 }

@@ -1,0 +1,9 @@
+{
+  "port":9000,
+  "dataServers":[
+    {
+      "ip":"localhost",
+      "port":8083
+    }
+  ]
+}

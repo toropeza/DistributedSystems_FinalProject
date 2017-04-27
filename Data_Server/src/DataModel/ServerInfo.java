@@ -1,9 +1,9 @@
 package DataModel;
 
 /**
- * Information describing a Web Server
+ * Information describing a Data Server
  */
-public class WebServerInfo {
+public class ServerInfo {
   private String ip;
   private int port;
 
