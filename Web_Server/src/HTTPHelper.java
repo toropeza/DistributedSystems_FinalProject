@@ -76,7 +76,7 @@ public class HTTPHelper {
   private String performHTTPMethod(String urlString, String httpMethod) throws Exception{
     //Builder for the response
     StringBuilder stringBuilder = new StringBuilder();
-
+    logger.info("Sending request " + urlString);
     HttpURLConnection httpURLConnection;
     try {
       URL url = new URL(urlString);

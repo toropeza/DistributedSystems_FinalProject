@@ -22,4 +22,9 @@ public class ServerInfo {
   public void setPort(int port) {
     this.port = port;
   }
+
+  @Override
+  public String toString() {
+    return ip + ":" + port;
+  }
 }

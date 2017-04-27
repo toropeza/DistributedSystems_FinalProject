@@ -1,13 +1,5 @@
 package DataModel;
 
-import util.ReadWriteLock;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 
@@ -18,37 +10,12 @@ public class MessageChannelList {
 
   static final Logger logger = Logger.getLogger(MessageChannelList.class.getName());
 
-  private final ReadWriteLock readWriteLock;
-  private ConcurrentHashMap<String, List<ChannelPosting>> channelPostings;
-  private long messageIDCount;
+  private String channelPosting;
   private long versionNumber;
 
   public MessageChannelList(){
-    readWriteLock = new ReadWriteLock();
-    channelPostings = new ConcurrentHashMap<>();
-    messageIDCount = 0;
+    channelPosting = "empty";
     versionNumber = 0;
-  }
-
-  /**
-   * Applies the given database.
-   * @param channelPostings The new database to add
-   */
-  public void addDatabase(Map<String, List<ChannelPosting>> channelPostings){
-    readWriteLock.lockWrite();
-    this.channelPostings.putAll(channelPostings);
-    readWriteLock.unlockWrite();
-  }
-
-  /**
-   * Sets the given database.
-   * @param channelPostings The new database to add
-   */
-  public void setDatabase(Map<String, List<ChannelPosting>> channelPostings){
-    readWriteLock.lockWrite();
-    this.channelPostings = new ConcurrentHashMap<>();
-    this.channelPostings.putAll(channelPostings);
-    readWriteLock.unlockWrite();
   }
 
   /**
@@ -58,9 +25,7 @@ public class MessageChannelList {
    * */
   public long freshVersion(long currentVersion){
     long upToDateVersion;
-    readWriteLock.lockRead();
     long channelListVersion = versionNumber;
-    readWriteLock.unlockRead();
     if (currentVersion < channelListVersion){
       upToDateVersion = channelListVersion;
     } else {
@@ -74,9 +39,7 @@ public class MessageChannelList {
    */
   public long versionNumber(){
     long version;
-    readWriteLock.lockRead();
     version = versionNumber;
-    readWriteLock.unlockRead();
     return version;
   }
 
@@ -84,97 +47,24 @@ public class MessageChannelList {
    * Thread safe method for retrieving a channel's history
    * @return The Channel's History
    * */
-  public Object[] getChannelHistory(String channelName){
-    Object[] channelHistory = null;
-    readWriteLock.lockRead();
-    if (channelPostings.containsKey(channelName)){
-      List<ChannelPosting> copiedHistory = deepCopyHistory(channelName);
-      channelHistory = copiedHistory.toArray();
-    }
-    readWriteLock.unlockRead();
-    return channelHistory;
+  public String getChannelPosting(){
+    return channelPosting;
   }
 
   /**
-   * Thread safe method for retrieving a channel's database
-   * @return The Channel's database
-   * */
-  public Map<String, List<ChannelPosting>> getDatabase(){
-    Map<String, List<ChannelPosting>> database = null;
-    readWriteLock.lockRead();
-    database = deepCopyDatabase();
-    readWriteLock.unlockRead();
-    return database;
-  }
-
-  /**
-   * Returns a deep copy of the database for thread safety
-   * Used to reply to a spawning secondary server
-   * @return The deep copy of the database structure
-   */
-  private Map<String, List<ChannelPosting>> deepCopyDatabase(){
-    HashMap<String, List<ChannelPosting>> copiedDatabase = new HashMap<>();
-    for (String channelName: channelPostings.keySet()){
-      copiedDatabase.put(channelName, deepCopyHistory(channelName));
-    }
-    return copiedDatabase;
-  }
-
-  /**
-   * Returns a deep copy of the channel's history for thread safety
-   * Used to reply to a spawning secondary server
-   * @param channelName The channel to copy
-   * @return The deep copy of the channel's history
-   */
-  private List<ChannelPosting> deepCopyHistory(String channelName){
-    ArrayList<ChannelPosting> copiedHistory = new ArrayList<>();
-    List<ChannelPosting> referencedHistory = channelPostings.get(channelName);
-    for (ChannelPosting channelPosting: referencedHistory){
-      long id = channelPosting.getId();
-      String text = channelPosting.getText();
-      ChannelPosting copiedPosting = new ChannelPosting(id, text);
-      copiedHistory.add(copiedPosting);
-    }
-    return copiedHistory;
-  }
-
-  /**
-   * Thread safe method for posting to a given channel.
+   * Thread safe method for posting a message
    * If the channel does not exist it will be created.
-   * @param channel The channel to post to
    * @param message The text to post
    * @return the id associated with the posting
    * */
-  public long postMessage(String channel, String message){
-    readWriteLock.lockWrite();
-    messageIDCount++;
+  public long postMessage(String message){
     versionNumber++;
-    if (channelPostings.containsKey(channel)){
-      ChannelPosting posting = new ChannelPosting(messageIDCount, message);
-      channelPostings.get(channel).add(posting);
-    }else {
-      List<ChannelPosting> channelList = Collections.synchronizedList(new ArrayList<>());
-      ChannelPosting posting = new ChannelPosting(messageIDCount, message);
-      channelList.add(posting);
-      channelPostings.put(channel, channelList);
-    }
-    logger.info("Database: " + channelPostings.size() + " channels");
-    for (String dbChannel: channelPostings.keySet()){
-      List<ChannelPosting> postings = channelPostings.get(dbChannel);
-      logger.info("Channel: " + dbChannel);
-      for (ChannelPosting posting: postings){
-        logger.info("    " + posting.getText());
-      }
-    }
-    readWriteLock.unlockWrite();
-    return messageIDCount;
+    channelPosting = message;
+    return versionNumber;
   }
 
 
   public void setVersionNumber(long versionNumber){
-    readWriteLock.lockRead();
     this.versionNumber = versionNumber;
-    this.messageIDCount = versionNumber;
-    readWriteLock.unlockRead();
   }
 }

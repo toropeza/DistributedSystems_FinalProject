@@ -1,3 +1,4 @@
+import DataModel.ServerInfo;
 import com.google.gson.Gson;
 import util.JSONServerConfigModel;
 
@@ -7,6 +8,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.List;
 import java.util.logging.Logger;
 
 /**
@@ -31,8 +33,8 @@ public class DataServer {
       JSONServerConfigModel config = gson.fromJson(jsonConfig, JSONServerConfigModel.class);
 
       int port = config.getPort();
-      DataServerAPI dataServerAPI = new DataServerAPI(port);
-
+      List<ServerInfo> otherDataServers = config.getDataServers();
+      DataServerAPI dataServerAPI = new DataServerAPI(port, otherDataServers, config.getTest());
       try (ServerSocket serverSocket = new ServerSocket(port);) {
 
         logger.info("Data Server Running");

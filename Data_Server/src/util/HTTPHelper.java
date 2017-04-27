@@ -1,3 +1,5 @@
+package util;
+
 import sun.net.www.protocol.http.HttpURLConnection;
 
 import java.io.BufferedReader;
@@ -14,7 +16,7 @@ import java.util.logging.Logger;
  */
 public class HTTPHelper {
 
-  static final Logger logger = Logger.getLogger(DataServer.class.getName());
+  static final Logger logger = Logger.getLogger(HTTPHelper.class.getName());
 
   private final String HTTP_GET = "GET";
   private final long timeoutValue = 800;

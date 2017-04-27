@@ -1,5 +1,4 @@
 import DataModel.DataServerList;
-import DataModel.MessageCache;
 import DataModel.ServerInfo;
 import util.WorkQueue;
 
@@ -12,9 +11,6 @@ import java.util.Random;
  */
 public class WebServerAPI {
 
-  //cache of starred Messages in a channel
-  private MessageCache starredMessageCache;
-
   //list of data servers
   public static DataServerList dataServerList;
 
@@ -23,7 +19,6 @@ public class WebServerAPI {
 
   public WebServerAPI(List<ServerInfo> dataServers){
     workQueue = new WorkQueue();
-    starredMessageCache = new MessageCache();
     dataServerList = new DataServerList();
     dataServerList.setDataServers(dataServers);
   }
@@ -36,6 +31,6 @@ public class WebServerAPI {
     ServerInfo pickedDataServer = dataServerList.getDataServer(randPick);
     String dataServerPort = String.valueOf(pickedDataServer.getPort());
     String dataServerIP = pickedDataServer.getIp();
-    workQueue.execute(new WebServerAPIHelper(socketConnection, dataServerPort, dataServerIP, starredMessageCache));
+    workQueue.execute(new WebServerAPIHelper(socketConnection, dataServerPort, dataServerIP));
   }
 }

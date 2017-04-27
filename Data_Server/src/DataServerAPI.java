@@ -2,10 +2,10 @@ import DataModel.ChannelPosting;
 import DataModel.ServerInfo;
 import DataModel.DataServerList;
 import DataModel.MessageChannelList;
-import DataModel.WebServerList;
-import GsonModels.ResponseModels.NewSecondaryResponse;
+import Paxos.PaxosManager;
 import com.google.gson.Gson;
-import util.WorkQueue;
+import util.*;
+import util.HTTPHelper;
 
 import java.net.Socket;
 import java.util.ArrayList;
@@ -30,53 +30,33 @@ public class DataServerAPI {
   //Queue of runnables executed by Threads
   private WorkQueue workQueue;
 
-  private HTTPHelper httpHelper = new HTTPHelper();
+  private util.HTTPHelper httpHelper = new HTTPHelper();
 
   //Gson object for JSON parsing
   private Gson gson;
 
-  //Collection for caching requests
-  private ArrayList<String> cachedRequests;
-
   //Port used to run this instance
   public static int port;
 
-  //Timer used to send heartbeat messages
-  Timer timer = new Timer();
-
+  private PaxosManager paxosManager;
   /**
    * Creates a new Data Server
    */
-  public DataServerAPI(int port){
+  public DataServerAPI(int port, List<ServerInfo> otherDataServers, int killround){
     this.port = port;
     messageChannelList = new MessageChannelList();
     dataServers = new DataServerList();
+    dataServers.setDataServers(otherDataServers);
     workQueue = new WorkQueue();
-    cachedRequests = new ArrayList<>();
     gson = new Gson();
-    timer.schedule(new HeartBeatSender(dataServers, messageChannelList), 0, HeartBeatSender.TIME_TO_SEND);
-  }
-  /**
-   * Sets the Data Server group membership retrieved from primary or config file
-   * @param dataServerInfo The data server info list
-   */
-  public void setDataServers(List<ServerInfo> dataServerInfo){
-    dataServers.setDataServers(dataServerInfo);
-  }
-
-  /**
-   * Sets the database retrieved from the primary when booting up the secondary data server
-   * @param db The full database
-   */
-  public void addDatabase(Map<String, List<ChannelPosting>> db){
-    messageChannelList.addDatabase(db);
+    paxosManager = new PaxosManager(dataServers, killround);
   }
 
   /**
    * Asynchronously parses the incoming connection
    * */
   public void parseAPIRequest(Socket socketConnection){
-    workQueue.execute(new DataServerAPIHelper(socketConnection, messageChannelList, dataServers));
+    workQueue.execute(new DataServerAPIHelper(socketConnection, messageChannelList, dataServers, paxosManager));
 
   }
 }

@@ -3,16 +3,16 @@ package GsonModels.ResponseModels;
 /**
  * Created by thomasoropeza on 2/20/17.
  */
-public class ChannelsHistoryResponse {
+public class ChannelsPostingResponse {
 
   private boolean success;
-  private Object[] messages;
+  private String posting;
 
   public void setSuccess(boolean success) {
     this.success = success;
   }
 
-  public void setMessages(Object[] messages) {
-    this.messages = messages;
+  public void setPosting(String posting) {
+    this.posting = posting;
   }
 }

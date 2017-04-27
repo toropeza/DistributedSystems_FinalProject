@@ -1,6 +1,18 @@
 {
-  "server_type": "secondary",
   "port":8081,
-  "primaryIp" : "127.0.0.1",
-  "primaryPort" : "8083"
+  "test":2,
+  "dataServers":[
+    {
+      "ip":"localhost",
+      "port": 8083
+    },
+    {
+      "ip":"localhost",
+      "port": 8082
+    },
+    {
+      "ip":"localhost",
+      "port": 8080
+    }
+  ]
 }

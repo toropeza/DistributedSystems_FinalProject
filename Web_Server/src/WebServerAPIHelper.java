@@ -1,8 +1,4 @@
-import DataModel.ChannelPosting;
-import DataModel.MessageCache;
 import DataModel.ServerInfo;
-import ResponseModels.ChannelsHistoryResponse;
-import ResponseModels.DSChannelsStarResponse;
 import ResponseModels.SuccessResponse;
 import com.google.gson.Gson;
 import util.RequestBuilder;
@@ -44,9 +40,6 @@ public class WebServerAPIHelper implements Runnable {
   String dataServerPort;
   String dataServerIP;
 
-  //Cache for starred messages
-  MessageCache starredMessageCache;
-
   //Builds Requests for the API
   RequestBuilder requestBuilder;
 
@@ -55,13 +48,11 @@ public class WebServerAPIHelper implements Runnable {
    * @param socket The socket connection wishing to make an API Request
    * @param dataServerPort port for data server running on the same ip
    * @param dataServerIP The IP Adress of the server running the Data Server
-   * @param starredMessageCache The Message Cache for storing starred messages
    * */
-  public WebServerAPIHelper(Socket socket, String dataServerPort, String dataServerIP, MessageCache starredMessageCache){
+  public WebServerAPIHelper(Socket socket, String dataServerPort, String dataServerIP){
     this.socket = socket;
     this.dataServerPort = dataServerPort;
     this.dataServerIP = dataServerIP;
-    this.starredMessageCache = starredMessageCache;
     gson = new Gson();
     httpHelper = new HTTPHelper();
     requestBuilder = new RequestBuilder(new ServerInfo(dataServerIP, Integer.valueOf(dataServerPort)));
@@ -111,105 +102,16 @@ public class WebServerAPIHelper implements Runnable {
     String[] path = request.split("/");
     if (path.length == 3){
       String[] methodAndParams = path[2].split("\\?");
+      String method = methodAndParams[0];
       if (methodAndParams.length == 2){
-        String method = methodAndParams[0];
         String params = methodAndParams[1];
         if (method.equals(RequestBuilder.postMessageMethod)){
           response = postMessageToChannel(params);
-        }else if (method.equals(RequestBuilder.channelHistoryMethod)){
-          response = returnChannelHistory(params);
-        }else if (method.equals(RequestBuilder.messageStarMethod)){
-          response = starChannelMessage(params);
-        }else if (method.equals(RequestBuilder.channelStarMethod)){
-          response = getChannelStarredHistory(params);
-        }
-      }
-    }
-    return response;
-  }
-
-  /**
-   * Returns the JSON Response for retrieving the channel's starred history
-   * @param params The parameters from the REST call
-   * @return The JSON Response
-   * */
-  public String getChannelStarredHistory(String params){
-    String response = HTTP404;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("channel")){
-        String channel = urlParamsMap.get("channel");
-        if (channel != null){
-          String versionNumber = String.valueOf(starredMessageCache.getVersionNumber());
-          String channelStarredHistoryRequest = requestBuilder.buildDSChannelsStarRequest(channel, versionNumber);
-          try {
-            String json = httpHelper.performHttpGet(channelStarredHistoryRequest);
-            DSChannelsStarResponse dsChannelsStarResponse = gson.fromJson(json, DSChannelsStarResponse.class);
-
-            //Build the starred History response
-            ChannelsHistoryResponse starredChannelHistoryResponse = new ChannelsHistoryResponse();
-            if (dsChannelsStarResponse.isSuccess()){
-              starredChannelHistoryResponse.setSuccess(true);
-              //Serve starred messaged from cache or Data Server depending on version
-              if (!dsChannelsStarResponse.getVersion().equals(versionNumber)){
-                //web server cache is outdated, update cache
-                logger.info("Web Server Cache is Outdated. Version is " + versionNumber);
-                long freshVersion = Long.valueOf(dsChannelsStarResponse.getVersion());
-                ChannelPosting[] starredMessages = dsChannelsStarResponse.getMessages();
-                starredMessageCache.updateCache(freshVersion, channel, starredMessages);
-                logger.info("Web Server Cache Updated. New Version is " + freshVersion);
-              }else {
-                logger.info("Web Server Cache is up to Date. Serving from Cache");
-              }
-              //respond with fresh cache data
-              starredChannelHistoryResponse.setMessages(starredMessageCache.getChannelStarredHistory(channel));
-            }else {
-              starredChannelHistoryResponse.setSuccess(false);
-            }
-            String starredChannelHistoryJSON = gson.toJson(starredChannelHistoryResponse);
-            response = buildHTTPResponse(starredChannelHistoryJSON);
-          }catch (Exception e){
-            SuccessResponse successResponse = new SuccessResponse();
-            successResponse.setSuccess(false);
-            response = buildHTTPResponse(gson.toJson(successResponse));
-          }
-
-        }else {
-          response = HTTP400;
         }
       }else {
-        response = HTTP404;
-      }
-    }
-    return response;
-  }
-
-  /**
-   * Stars a message
-   * @param params The parameters from the REST call
-   * @return The JSON Response
-   * */
-  public String starChannelMessage(String params){
-    String response = HTTP404;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("messageid")){
-        String messageid = urlParamsMap.get("messageid");
-        if (messageid != null){
-          String starMessageRequest = requestBuilder.buildDSStarMessageRequest(messageid);
-          try {
-            String json = httpHelper.performHttpGet(starMessageRequest);
-            response = buildHTTPResponse(json);
-          }catch (Exception e){
-            SuccessResponse successResponse = new SuccessResponse();
-            successResponse.setSuccess(false);
-            response = buildHTTPResponse(gson.toJson(successResponse));
-          }
-        }else {
-          response = HTTP400;
+        if (method.equals(RequestBuilder.channelPostingMethod)){
+          response = returnChannelPosting();
         }
-      }else {
-        response = HTTP404;
       }
     }
     return response;
@@ -217,31 +119,18 @@ public class WebServerAPIHelper implements Runnable {
 
   /**
    * Returns the JSON Response for retrieving the channel history
-   * @param params The parameters from the REST call
    * @return The JSON Response
    * */
-  public String returnChannelHistory(String params){
+  public String returnChannelPosting(){
     String response = HTTP404;
-    if (params != null){
-      HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("channel")){
-        String channel = urlParamsMap.get("channel");
-        if (channel != null){
-          try {
-            String channelHistoryRequest = requestBuilder.buildDSChannelHistoryRequest(channel);
-            String json = httpHelper.performHttpGet(channelHistoryRequest);
-            response = buildHTTPResponse(json);
-          }catch (Exception e){
-            SuccessResponse successResponse = new SuccessResponse();
-            successResponse.setSuccess(false);
-            response = buildHTTPResponse(gson.toJson(successResponse));
-          }
-        }else {
-          response = HTTP400;
-        }
-      }else {
-        response = HTTP404;
-      }
+    try {
+      String channelHistoryRequest = requestBuilder.buildDSChannelHistoryRequest();
+      String json = httpHelper.performHttpGet(channelHistoryRequest);
+      response = buildHTTPResponse(json);
+    }catch (Exception e){
+      SuccessResponse successResponse = new SuccessResponse();
+      successResponse.setSuccess(false);
+      response = buildHTTPResponse(gson.toJson(successResponse));
     }
     return response;
   }
@@ -255,12 +144,11 @@ public class WebServerAPIHelper implements Runnable {
     String response = HTTP404;
     if (params != null){
       HashMap<String, String> urlParamsMap = httpHelper.parseURLParams(params);
-      if (urlParamsMap != null && urlParamsMap.containsKey("channel") && urlParamsMap.containsKey("text")){
-        String channel = urlParamsMap.get("channel");
+      if (urlParamsMap != null && urlParamsMap.containsKey("text")){
         String text = urlParamsMap.get("text");
-        if (channel != null && text != null){
+        if (text != null){
           try {
-            String postMessageRequest = requestBuilder.buildDSPostMessageRequest(channel, text);
+            String postMessageRequest = requestBuilder.buildDSPostMessageRequest(text);
             String json = httpHelper.performHttpGet(postMessageRequest);
             response = buildHTTPResponse(json);
           }catch (Exception e){
