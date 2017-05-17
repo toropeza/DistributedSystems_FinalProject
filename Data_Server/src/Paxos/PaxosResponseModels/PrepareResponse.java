@@ -6,6 +6,15 @@ package Paxos.PaxosResponseModels;
 public class PrepareResponse {
 
   boolean promise;
+  Object prevValue;
+
+  public Object getPrevValue() {
+    return prevValue;
+  }
+
+  public void setPrevValue(Object prevValue) {
+    this.prevValue = prevValue;
+  }
 
   public boolean promised() {
     return promise;

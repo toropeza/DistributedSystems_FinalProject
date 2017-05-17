@@ -23,8 +23,6 @@ public class DataServerAPIHelper implements Runnable {
 
   static final Logger logger = Logger.getLogger(DataServer.class.getName());
 
-  private final int ELECTION_TIMEOUT = 5000;
-
   //API Methods
   private final String postMessageMethod = "chat.postMessage";
   private final String channelPostingMethod = "channels.posting";
@@ -154,9 +152,9 @@ public class DataServerAPIHelper implements Runnable {
           boolean success = true;
           boolean consensus = paxosManager.sendWriteRequest(text);
           if (consensus){
-            long messageID = channelList.postMessage(text);
+            channelList.postMessage(text);
             logger.info("Posted message to channel");
-            String json = getPostMessageResponse(success, String.valueOf(messageID));
+            String json = getPostMessageResponse(success);
             response = httpHelper.buildHTTPResponse(json);
           }else {
             logger.info("Could not reach consensus");
@@ -174,10 +172,9 @@ public class DataServerAPIHelper implements Runnable {
   /**
    * @return the JSON response for posting to a channel
    * */
-  public String getPostMessageResponse(boolean success, String messageID){
+  public String getPostMessageResponse(boolean success){
     ChatPostMessageResponse chatPostMessageResponse = new ChatPostMessageResponse();
     chatPostMessageResponse.setSuccess(success);
-    chatPostMessageResponse.setId(messageID);
     return gson.toJson(chatPostMessageResponse);
   }
 

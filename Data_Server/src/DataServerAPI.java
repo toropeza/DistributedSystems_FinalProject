@@ -38,18 +38,20 @@ public class DataServerAPI {
   //Port used to run this instance
   public static int port;
 
+  public static int START_SEQUENCE_NUM = 0;
+
   private PaxosManager paxosManager;
   /**
    * Creates a new Data Server
    */
-  public DataServerAPI(int port, List<ServerInfo> otherDataServers, int killround){
+  public DataServerAPI(int port, List<ServerInfo> otherDataServers, int killround, int startSequenceNum){
     this.port = port;
     messageChannelList = new MessageChannelList();
     dataServers = new DataServerList();
     dataServers.setDataServers(otherDataServers);
     workQueue = new WorkQueue();
     gson = new Gson();
-    paxosManager = new PaxosManager(dataServers, killround);
+    paxosManager = new PaxosManager(dataServers, killround, startSequenceNum);
   }
 
   /**
@@ -57,6 +59,5 @@ public class DataServerAPI {
    * */
   public void parseAPIRequest(Socket socketConnection){
     workQueue.execute(new DataServerAPIHelper(socketConnection, messageChannelList, dataServers, paxosManager));
-
   }
 }

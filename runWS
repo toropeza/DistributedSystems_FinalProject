@@ -1,0 +1,2 @@
+!#bin/bash
+java -cp gson-2.8.1-SNAPSHOT.jar:Web_Server.jar WebServer $1

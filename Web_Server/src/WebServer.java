@@ -27,7 +27,6 @@ public class WebServer {
   private static String configFilename;
 
   public static void main(String[] args) {
-    ArgumentParser argumentParser = new ArgumentParser(args);
     Gson gson = new Gson();
 
     configFilename = args[0];

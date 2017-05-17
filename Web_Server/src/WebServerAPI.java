@@ -27,7 +27,7 @@ public class WebServerAPI {
    * Asynchronously parses the incoming connection
    * */
   public void parseAPIRequest(Socket socketConnection){
-    int randPick = new Random().nextInt(dataServerList.size());
+    int randPick = 0;
     ServerInfo pickedDataServer = dataServerList.getDataServer(randPick);
     String dataServerPort = String.valueOf(pickedDataServer.getPort());
     String dataServerIP = pickedDataServer.getIp();

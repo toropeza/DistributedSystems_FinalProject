@@ -1,0 +1,17 @@
+{
+  "port":8085,
+  "dataServers":[
+    {
+      "ip":"localhost",
+      "port": 8083
+    },
+    {
+      "ip":"localhost",
+      "port": 8082
+    },
+    {
+      "ip":"localhost",
+      "port": 8081
+    }
+  ]
+}

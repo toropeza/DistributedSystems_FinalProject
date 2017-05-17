@@ -1,4 +1,5 @@
 import DataModel.ServerInfo;
+import Paxos.PaxosManager;
 import com.google.gson.Gson;
 import util.JSONServerConfigModel;
 
@@ -31,13 +32,12 @@ public class DataServer {
       BufferedReader reader = new BufferedReader(new FileReader(configFilename));
       String jsonConfig = readFile(reader);
       JSONServerConfigModel config = gson.fromJson(jsonConfig, JSONServerConfigModel.class);
-
       int port = config.getPort();
       List<ServerInfo> otherDataServers = config.getDataServers();
-      DataServerAPI dataServerAPI = new DataServerAPI(port, otherDataServers, config.getTest());
+      DataServerAPI dataServerAPI = new DataServerAPI(port, otherDataServers, config.getTest(), config.getStartSequenceNum());
       try (ServerSocket serverSocket = new ServerSocket(port);) {
 
-        logger.info("Data Server Running");
+        logger.info("Data Server Running on port " + port);
         //repeatedly wait for connections
         while (true) {
           Socket socket = serverSocket.accept();

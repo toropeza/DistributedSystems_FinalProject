@@ -1,0 +1,2 @@
+!#bin/bash
+java -cp gson-2.8.1-SNAPSHOT.jar:Data_Server.jar DataServer $1

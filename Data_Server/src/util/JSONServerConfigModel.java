@@ -11,7 +11,16 @@ public class JSONServerConfigModel {
   int port;
   ServerInfo webserver;
   List<ServerInfo> dataServers;
+  int startSequenceNum;
   int test;
+
+  public int getStartSequenceNum() {
+    return startSequenceNum;
+  }
+
+  public void setStartSequenceNum(int startSequenceNum) {
+    this.startSequenceNum = startSequenceNum;
+  }
 
   public int getTest() {
     return test;
