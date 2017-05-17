@@ -157,7 +157,7 @@ public class DataServerAPIHelper implements Runnable {
             String json = getPostMessageResponse(success);
             response = httpHelper.buildHTTPResponse(json);
           }else {
-            logger.info("Could not reach consensus");
+            logger.info("Unsuccessful Paxos round");
           }
         }else {
           response = httpHelper.HTTP400;
